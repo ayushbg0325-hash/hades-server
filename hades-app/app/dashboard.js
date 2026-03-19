@@ -7,7 +7,7 @@ export default function Dashboard() {
   const [products, setProducts] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:3000/products")
+    fetch("https://hades-server.onrender.com/products")
       .then((res) => res.json())
       .then((data) => setProducts(data))
       .catch((err) => console.log(err));
@@ -17,7 +17,7 @@ export default function Dashboard() {
     try {
       const token = await AsyncStorage.getItem("token");
 
-      const response = await fetch("http://localhost:3000/cart", {
+      const response = await fetch("https://hades-server.onrender.com/cart", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

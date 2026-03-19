@@ -7,7 +7,7 @@ export default function OrderDetails() {
   const [items, setItems] = useState([]);
 
   useEffect(() => {
-    fetch(`http://localhost:3000/order-details/${id}`)
+    fetch(`https://hades-server.onrender.com/order-details/${id}`)
       .then((res) => res.json())
       .then((data) => setItems(data));
   }, []);

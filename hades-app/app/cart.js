@@ -9,7 +9,7 @@ export default function Cart() {
     try {
       const token = await AsyncStorage.getItem("token");
 
-      const response = await fetch("http://localhost:3000/cart", {
+      const response = await fetch("https://hades-server.onrender.com/cart", {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -28,7 +28,7 @@ export default function Cart() {
 
   const removeFromCart = async (id) => {
     try {
-      const response = await fetch(`http://localhost:3000/cart/${id}`, {
+      const response = await fetch(`https://hades-server.onrender.com/cart/${id}`, {
         method: "DELETE"
       });
 
@@ -53,7 +53,7 @@ export default function Cart() {
     }
 
     try {
-      const response = await fetch(`http://localhost:3000/cart/${id}`, {
+      const response = await fetch(`https://hades-server.onrender.com/cart/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -80,7 +80,7 @@ export default function Cart() {
     try {
       const token = await AsyncStorage.getItem("token");
 
-      const response = await fetch("http://localhost:3000/checkout", {
+      const response = await fetch("https://hades-server.onrender.com/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
