@@ -1,10 +1,12 @@
+require("dotenv").config();
+
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
+
 const app = express();
-require("dotenv").config();
 app.use(express.json());
 app.use(cors());
 
@@ -12,17 +14,16 @@ app.get("/", (req, res) => {
   res.send("API ажиллаж байна 🚀");
 });
 
-// MySQL connection
-const mysql = require("mysql2");
-
 const db = mysql.createConnection(process.env.MYSQL_PUBLIC_URL);
 
 db.connect((err) => {
-  if (err) console.error("DB холболт алдаа:", err);
-  else console.log("DB амжилттай холбогдлоо");
+  if (err) {
+    console.error("DB холболт алдаа:", err);
+  } else {
+    console.log("DB амжилттай холбогдлоо");
+  }
 });
 
-// JWT secret
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // Middleware: token шалгах
