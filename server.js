@@ -496,6 +496,24 @@ app.get("/admin/stats", verifyToken, verifyAdmin, (req, res) => {
     }
   );
 });
+app.get("/admin/revenue-chart", verifyToken, verifyAdmin, (req, res) => {
+  db.query(
+    `
+    SELECT DATE(created_at) AS day, SUM(total) AS revenue
+    FROM orders
+    GROUP BY DATE(created_at)
+    ORDER BY day ASC
+    `,
+    (err, result) => {
+      if (err) {
+        console.log("REVENUE CHART ERROR:", err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.json(result);
+    }
+  );
+});
 // ------------------- START SERVER -------------------
 const PORT = process.env.PORT || 3000;
 
