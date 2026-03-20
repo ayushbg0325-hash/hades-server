@@ -5,7 +5,6 @@ const jwt = require("jsonwebtoken");
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
-
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -422,7 +421,19 @@ app.get("/order-details/:orderId", (req, res) => {
     }
   );
 });
+app.get("/admin/orders", verifyToken, verifyAdmin, (req, res) => {
+  db.query(
+    "SELECT * FROM orders ORDER BY created_at DESC",
+    (err, result) => {
+      if (err) {
+        console.log("ADMIN ORDERS ERROR:", err);
+        return res.status(500).json({ error: err.message });
+      }
 
+      res.json(result);
+    }
+  );
+});
 // ------------------- START SERVER -------------------
 const PORT = process.env.PORT || 3000;
 
