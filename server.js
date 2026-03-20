@@ -434,6 +434,33 @@ app.get("/admin/orders", verifyToken, verifyAdmin, (req, res) => {
     }
   );
 });
+app.get("/admin/orders/:id", verifyToken, verifyAdmin, (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    `SELECT 
+      order_items.id,
+      order_items.quantity,
+      products.name,
+      products.price,
+      orders.total,
+      orders.user_id,
+      orders.created_at
+     FROM order_items
+     JOIN products ON order_items.product_id = products.id
+     JOIN orders ON order_items.order_id = orders.id
+     WHERE order_items.order_id = ?`,
+    [id],
+    (err, result) => {
+      if (err) {
+        console.log("ADMIN ORDER DETAILS ERROR:", err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.json(result);
+    }
+  );
+});
 // ------------------- START SERVER -------------------
 const PORT = process.env.PORT || 3000;
 
