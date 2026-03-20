@@ -478,6 +478,24 @@ app.put("/admin/orders/:id/status", verifyToken, verifyAdmin, (req, res) => {
     }
   );
 });
+app.get("/admin/stats", verifyToken, verifyAdmin, (req, res) => {
+  db.query(
+    `
+    SELECT
+      (SELECT COUNT(*) FROM orders) AS totalOrders,
+      (SELECT COALESCE(SUM(total), 0) FROM orders) AS totalRevenue,
+      (SELECT COUNT(*) FROM orders WHERE status = 'pending') AS pendingOrders
+    `,
+    (err, result) => {
+      if (err) {
+        console.log("ADMIN STATS ERROR:", err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.json(result[0]);
+    }
+  );
+});
 // ------------------- START SERVER -------------------
 const PORT = process.env.PORT || 3000;
 
