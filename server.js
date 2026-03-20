@@ -461,6 +461,23 @@ app.get("/admin/orders/:id", verifyToken, verifyAdmin, (req, res) => {
     }
   );
 });
+app.put("/admin/orders/:id/status", verifyToken, verifyAdmin, (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  db.query(
+    "UPDATE orders SET status = ? WHERE id = ?",
+    [status, id],
+    (err, result) => {
+      if (err) {
+        console.log("UPDATE ORDER STATUS ERROR:", err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.json({ message: "Order status шинэчлэгдлээ" });
+    }
+  );
+});
 // ------------------- START SERVER -------------------
 const PORT = process.env.PORT || 3000;
 
