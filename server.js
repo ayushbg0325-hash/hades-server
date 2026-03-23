@@ -120,55 +120,9 @@ app.get("/profile", verifyToken, (req, res) => {
   res.json({ msg: "Таны мэдээлэл", user: req.user });
 });
 
-// ------------------- TEST REGISTER -------------------
-app.get("/test-register", async (req, res) => {
-  const username = "admin";
-  const password = "1234";
 
-  const hashedPassword = await bcrypt.hash(password, 10);
 
-  db.query(
-    "INSERT INTO users (username, password) VALUES (?, ?)",
-    [username, hashedPassword],
-    (err) => {
-      if (err) return res.send(err);
-      res.send("REGISTER OK");
-    }
-  );
-});
 
-// ------------------- TEST LOGIN -------------------
-app.get("/test-login", (req, res) => {
-  const username = "admin";
-  const password = "1234";
-
-  db.query(
-    "SELECT * FROM users WHERE username = ?",
-    [username],
-    async (err, result) => {
-      if (err) return res.send(err);
-
-      if (result.length === 0) {
-        return res.send("USER NOT FOUND");
-      }
-
-      const user = result[0];
-      const isMatch = await bcrypt.compare(password, user.password);
-
-      if (!isMatch) {
-        return res.send("PASSWORD WRONG");
-      }
-
-      const token = jwt.sign(
-        { id: user.id, username: user.username, role: user.role },
-        JWT_SECRET,
-        { expiresIn: "1h" }
-      );
-
-      res.json({ token });
-    }
-  );
-});
 
 // ------------------- PRODUCTS -------------------
 app.get("/products", (req, res) => {
@@ -269,7 +223,7 @@ app.get("/cart", verifyToken, (req, res) => {
   );
 });
 
-app.get("/cart/:userId", (req, res) => {
+app.get("/cart/:userId", verifyToken, (req, res) => {
   const { userId } = req.params;
 
   db.query(
@@ -289,7 +243,7 @@ app.get("/cart/:userId", (req, res) => {
   );
 });
 
-app.put("/cart/:id", (req, res) => {
+app.put("/cart/:id", verifyToken, (req, res) => {
   const { id } = req.params;
   const { quantity } = req.body;
 
@@ -307,7 +261,7 @@ app.put("/cart/:id", (req, res) => {
   );
 });
 
-app.delete("/cart/:id", (req, res) => {
+app.delete("/cart/:id", verifyToken, (req, res) => {
   const { id } = req.params;
 
   db.query("DELETE FROM cart WHERE id = ?", [id], (err) => {
@@ -385,7 +339,7 @@ app.post("/checkout", verifyToken, (req, res) => {
 });
 
 // ------------------- ORDERS -------------------
-app.get("/orders/:userId", (req, res) => {
+app.get("/orders/:userId", verifyToken, (req, res) => {
   const { userId } = req.params;
 
   db.query(
@@ -402,7 +356,7 @@ app.get("/orders/:userId", (req, res) => {
   );
 });
 
-app.get("/order-details/:orderId", (req, res) => {
+app.get("/order-details/:orderId", verifyToken, (req, res) => {
   const { orderId } = req.params;
 
   db.query(
@@ -515,26 +469,7 @@ app.get("/admin/stats", verifyToken, verifyAdmin, (req, res) => {
     }
   );
 });
-app.get("/admin/revenue-chart", verifyToken, verifyAdmin, (req, res) => {
-  db.query(
-    `
-    SELECT 
-      DATE(created_at) AS day,
-      SUM(total) AS revenue
-    FROM orders
-    GROUP BY DATE(created_at)
-    ORDER BY day ASC
-    `,
-    (err, result) => {
-      if (err) {
-        console.log("CHART ERROR:", err);
-        return res.status(500).json({ error: err.message });
-      }
 
-      res.json(result);
-    }
-  );
-});
 // ------------------- START SERVER -------------------
 const PORT = process.env.PORT || 3000;
 
