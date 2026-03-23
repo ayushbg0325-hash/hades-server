@@ -5,7 +5,9 @@ const jwt = require("jsonwebtoken");
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
+
 const app = express();
+
 app.use(express.json());
 app.use(cors());
 
@@ -13,6 +15,7 @@ app.get("/", (req, res) => {
   res.send("API ажиллаж байна 🚀");
 });
 
+// ------------------- DB CONNECTION -------------------
 const db = mysql.createConnection(process.env.MYSQL_PUBLIC_URL);
 
 db.connect((err) => {
@@ -23,9 +26,10 @@ db.connect((err) => {
   }
 });
 
+// ------------------- JWT SECRET -------------------
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Middleware: token шалгах
+// ------------------- MIDDLEWARE -------------------
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
 
@@ -44,7 +48,6 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// Middleware: admin шалгах
 const verifyAdmin = (req, res, next) => {
   if (req.user.role !== "admin") {
     return res.status(403).json({ msg: "Admin эрх шаардлагатай" });
@@ -119,10 +122,6 @@ app.post("/login", (req, res) => {
 app.get("/profile", verifyToken, (req, res) => {
   res.json({ msg: "Таны мэдээлэл", user: req.user });
 });
-
-
-
-
 
 // ------------------- PRODUCTS -------------------
 app.get("/products", (req, res) => {
@@ -328,7 +327,7 @@ app.post("/checkout", verifyToken, (req, res) => {
 
               res.json({
                 message: "Захиалга амжилттай",
-                total_price: total,
+                total_price: total
               });
             }
           );
@@ -375,6 +374,8 @@ app.get("/order-details/:orderId", verifyToken, (req, res) => {
     }
   );
 });
+
+// ------------------- ADMIN ORDERS -------------------
 app.get("/admin/orders", verifyToken, verifyAdmin, (req, res) => {
   db.query(
     "SELECT * FROM orders ORDER BY created_at DESC",
@@ -388,6 +389,7 @@ app.get("/admin/orders", verifyToken, verifyAdmin, (req, res) => {
     }
   );
 });
+
 app.get("/admin/orders/:id", verifyToken, verifyAdmin, (req, res) => {
   const { id } = req.params;
 
@@ -399,7 +401,8 @@ app.get("/admin/orders/:id", verifyToken, verifyAdmin, (req, res) => {
       products.price,
       orders.total,
       orders.user_id,
-      orders.created_at
+      orders.created_at,
+      orders.status
      FROM order_items
      JOIN products ON order_items.product_id = products.id
      JOIN orders ON order_items.order_id = orders.id
@@ -415,6 +418,7 @@ app.get("/admin/orders/:id", verifyToken, verifyAdmin, (req, res) => {
     }
   );
 });
+
 app.put("/admin/orders/:id/status", verifyToken, verifyAdmin, (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -422,13 +426,33 @@ app.put("/admin/orders/:id/status", verifyToken, verifyAdmin, (req, res) => {
   db.query(
     "UPDATE orders SET status = ? WHERE id = ?",
     [status, id],
-    (err, result) => {
+    (err) => {
       if (err) {
         console.log("UPDATE ORDER STATUS ERROR:", err);
         return res.status(500).json({ error: err.message });
       }
 
       res.json({ message: "Order status шинэчлэгдлээ" });
+    }
+  );
+});
+
+// ------------------- ADMIN DASHBOARD -------------------
+app.get("/admin/stats", verifyToken, verifyAdmin, (req, res) => {
+  db.query(
+    `
+    SELECT
+      (SELECT COUNT(*) FROM orders) AS totalOrders,
+      (SELECT COALESCE(SUM(total), 0) FROM orders) AS totalRevenue,
+      (SELECT COUNT(*) FROM orders WHERE status = 'pending') AS pendingOrders
+    `,
+    (err, result) => {
+      if (err) {
+        console.log("ADMIN STATS ERROR:", err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.json(result[0]);
     }
   );
 });
@@ -448,24 +472,6 @@ app.get("/admin/revenue-chart", verifyToken, verifyAdmin, (req, res) => {
       }
 
       res.json(result);
-    }
-  );
-});
-app.get("/admin/stats", verifyToken, verifyAdmin, (req, res) => {
-  db.query(
-    `
-    SELECT 
-      (SELECT COUNT(*) FROM orders) AS totalOrders,
-      (SELECT SUM(total) FROM orders) AS totalRevenue,
-      (SELECT COUNT(*) FROM orders WHERE status = 'pending') AS pendingOrders
-    `,
-    (err, result) => {
-      if (err) {
-        console.log("STATS ERROR:", err);
-        return res.status(500).json({ error: err.message });
-      }
-
-      res.json(result[0]);
     }
   );
 });
