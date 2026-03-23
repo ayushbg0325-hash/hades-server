@@ -1,24 +1,36 @@
 import { useEffect, useState } from "react";
-import { View, Text, FlatList, Button } from "react-native";
+import { View, Text, FlatList, Button, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const SERVER_URL = "https://hades-server.onrender.com";
 
 export default function Cart() {
   const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const loadCart = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
 
-      const response = await fetch("https://hades-server.onrender.com/cart", {
+      if (!token) {
+        Alert.alert("Алдаа", "Нэвтрээгүй байна");
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${SERVER_URL}/cart`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
 
       const data = await response.json();
-      setCartItems(data);
+      setCartItems(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.log(err);
+      console.log("LOAD CART ERROR:", err);
+      Alert.alert("Алдаа", "Сагс уншихад алдаа гарлаа");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -28,21 +40,20 @@ export default function Cart() {
 
   const removeFromCart = async (id) => {
     try {
-      const response = await fetch(`https://hades-server.onrender.com/cart/${id}`, {
+      const response = await fetch(`${SERVER_URL}/cart/${id}`, {
         method: "DELETE"
       });
 
       const data = await response.json();
 
       if (data.message) {
-        alert("Устгалаа");
         loadCart();
       } else {
-        alert("Устгаж чадсангүй");
+        Alert.alert("Алдаа", "Устгаж чадсангүй");
       }
     } catch (error) {
-      console.log(error);
-      alert("Сервер холбогдохгүй байна");
+      console.log("REMOVE CART ERROR:", error);
+      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
     }
   };
 
@@ -53,7 +64,7 @@ export default function Cart() {
     }
 
     try {
-      const response = await fetch(`https://hades-server.onrender.com/cart/${id}`, {
+      const response = await fetch(`${SERVER_URL}/cart/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -68,11 +79,11 @@ export default function Cart() {
       if (data.message) {
         loadCart();
       } else {
-        alert("Тоо шинэчилж чадсангүй");
+        Alert.alert("Алдаа", "Тоо шинэчилж чадсангүй");
       }
     } catch (error) {
-      console.log(error);
-      alert("Сервер холбогдохгүй байна");
+      console.log("UPDATE CART ERROR:", error);
+      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
     }
   };
 
@@ -80,7 +91,7 @@ export default function Cart() {
     try {
       const token = await AsyncStorage.getItem("token");
 
-      const response = await fetch("https://hades-server.onrender.com/checkout", {
+      const response = await fetch(`${SERVER_URL}/checkout`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,41 +100,46 @@ export default function Cart() {
       });
 
       const data = await response.json();
-      console.log("CHECKOUT RESPONSE:", data);
 
-      if (data.total_price !== undefined) {
-        alert(`Захиалга амжилттай\nНийт: ${data.total_price}₮`);
+      if (data.message) {
+        Alert.alert("Амжилттай", `${data.message}\nНийт: ${data.total_price || 0}₮`);
         loadCart();
       } else {
-        alert(data.message || "Алдаа гарлаа");
+        Alert.alert("Алдаа", "Checkout амжилтгүй");
       }
     } catch (error) {
-      console.log(error);
-      alert("Сервер холбогдохгүй байна");
+      console.log("CHECKOUT ERROR:", error);
+      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
     }
   };
 
   const totalPrice = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
+    (sum, item) => sum + Number(item.price) * Number(item.quantity),
     0
   );
 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>Түр хүлээнэ үү...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={{ flex: 1, backgroundColor: "#f5f5f5", padding: 16 }}>
-      <Text
-        style={{
-          fontSize: 28,
-          fontWeight: "bold",
-          marginBottom: 16,
-          textAlign: "center",
-        }}
-      >
+    <View style={{ flex: 1, padding: 20, backgroundColor: "#f5f5f5" }}>
+      <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 20 }}>
         🛒 Cart
       </Text>
 
       <FlatList
         data={cartItems}
         keyExtractor={(item) => item.id.toString()}
+        ListEmptyComponent={
+          <Text style={{ textAlign: "center", marginTop: 40 }}>
+            Сагс хоосон байна
+          </Text>
+        }
         renderItem={({ item }) => (
           <View
             style={{
@@ -131,54 +147,61 @@ export default function Cart() {
               borderRadius: 12,
               padding: 16,
               marginBottom: 12,
-              shadowColor: "#000",
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 3,
+              elevation: 2
             }}
           >
-            <Text style={{ fontSize: 20, fontWeight: "600" }}>{item.name}</Text>
-            <Text style={{ marginTop: 8 }}>Үнэ: {item.price}₮</Text>
-            <Text style={{ marginBottom: 12 }}>Тоо: {item.quantity}</Text>
+            <Text style={{ fontSize: 18, fontWeight: "600" }}>{item.name}</Text>
+            <Text style={{ marginTop: 6 }}>Үнэ: {item.price}₮</Text>
+            <Text>Тоо: {item.quantity}</Text>
 
             <View
               style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
-                marginBottom: 12
+                marginTop: 12,
+                gap: 10
               }}
             >
-              <Button
-                title="-"
-                onPress={() => updateQuantity(item.id, item.quantity - 1)}
-              />
-              <Button
-                title="+"
-                onPress={() => updateQuantity(item.id, item.quantity + 1)}
-              />
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="-"
+                  onPress={() => updateQuantity(item.id, item.quantity - 1)}
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Button
+                  title="+"
+                  onPress={() => updateQuantity(item.id, item.quantity + 1)}
+                />
+              </View>
             </View>
 
-            <Button
-              title="❌ Устгах"
-              onPress={() => removeFromCart(item.id)}
-            />
+            <View style={{ marginTop: 12 }}>
+              <Button
+                title="❌ Устгах"
+                color="#dc2626"
+                onPress={() => removeFromCart(item.id)}
+              />
+            </View>
           </View>
         )}
       />
 
-      <Text
+      <View
         style={{
-          fontSize: 22,
-          fontWeight: "bold",
-          marginTop: 10,
-          marginBottom: 12,
-          textAlign: "center",
+          backgroundColor: "white",
+          borderRadius: 12,
+          padding: 16,
+          marginTop: 10
         }}
       >
-        Нийт дүн: {totalPrice}₮
-      </Text>
+        <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 12 }}>
+          Нийт дүн: {totalPrice}₮
+        </Text>
 
-      <Button title="💳 Захиалах" onPress={checkout} />
+        <Button title="💳 Захиалах" onPress={checkout} />
+      </View>
     </View>
   );
 }

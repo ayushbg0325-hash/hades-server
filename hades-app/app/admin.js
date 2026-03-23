@@ -1,40 +1,54 @@
 import { useEffect, useState } from "react";
-import { View, Text, TextInput, Button, FlatList } from "react-native";
+import { View, Text, TextInput, Button, FlatList, Alert, Image } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 
+const SERVER_URL = "https://hades-server.onrender.com";
+
 export default function Admin() {
+  const [products, setProducts] = useState([]);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [image, setImage] = useState("");
-  const [products, setProducts] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const checkAdmin = async () => {
-    const token = await AsyncStorage.getItem("token");
+    try {
+      const token = await AsyncStorage.getItem("token");
 
-    if (!token) {
-      alert("Нэвтрээгүй байна");
-      router.replace("/");
+      if (!token) {
+        Alert.alert("Алдаа", "Нэвтрээгүй байна");
+        router.replace("/");
+        return false;
+      }
+
+      const payload = JSON.parse(atob(token.split(".")[1]));
+
+      if (payload.role !== "admin") {
+        Alert.alert("Алдаа", "Admin эрхгүй байна");
+        router.replace("/dashboard");
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.log("ADMIN CHECK ERROR:", error);
+      router.replace("/dashboard");
       return false;
     }
-
-    const payload = JSON.parse(atob(token.split(".")[1]));
-
-    if (payload.role !== "admin") {
-      alert("Та admin биш байна");
-      router.replace("/");
-      return false;
-    }
-
-    return true;
   };
 
-  const loadProducts = () => {
-    fetch("https://hades-server.onrender.com/products")
-      .then((res) => res.json())
-      .then((data) => setProducts(data))
-      .catch((err) => console.log(err));
+  const loadProducts = async () => {
+    try {
+      const response = await fetch(`${SERVER_URL}/products`);
+      const data = await response.json();
+      setProducts(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.log("LOAD PRODUCTS ERROR:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -48,13 +62,13 @@ export default function Admin() {
     init();
   }, []);
 
-  const addProduct = async () => {
+  const saveProduct = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
 
       const url = editingId
-        ? `http://localhost:3000/products/${editingId}`
-        : "http://localhost:3000/products";
+        ? `${SERVER_URL}/products/${editingId}`
+        : `${SERVER_URL}/products`;
 
       const method = editingId ? "PUT" : "POST";
 
@@ -74,20 +88,18 @@ export default function Admin() {
       const data = await response.json();
 
       if (data.message) {
-        alert(editingId ? "Product шинэчлэгдлээ" : "Product нэмэгдлээ");
-
+        Alert.alert("Амжилттай", editingId ? "Product шинэчлэгдлээ" : "Product нэмэгдлээ");
         setName("");
         setPrice("");
         setImage("");
         setEditingId(null);
-
         loadProducts();
       } else {
-        alert(data.msg || "Алдаа гарлаа");
+        Alert.alert("Алдаа", data.msg || "Алдаа гарлаа");
       }
     } catch (error) {
-      console.log(error);
-      alert("Сервер холбогдохгүй байна");
+      console.log("SAVE PRODUCT ERROR:", error);
+      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
     }
   };
 
@@ -95,7 +107,7 @@ export default function Admin() {
     try {
       const token = await AsyncStorage.getItem("token");
 
-      const response = await fetch(`http://localhost:3000/products/${id}`, {
+      const response = await fetch(`${SERVER_URL}/products/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`
@@ -105,51 +117,66 @@ export default function Admin() {
       const data = await response.json();
 
       if (data.message) {
-        alert("Product устгалаа");
+        Alert.alert("Амжилттай", "Product устгалаа");
         loadProducts();
       } else {
-        alert(data.msg || "Устгаж чадсангүй");
+        Alert.alert("Алдаа", "Устгаж чадсангүй");
       }
     } catch (error) {
-      console.log(error);
-      alert("Сервер холбогдохгүй байна");
+      console.log("DELETE PRODUCT ERROR:", error);
+      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
     }
   };
 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>Түр хүлээнэ үү...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 24, marginBottom: 20 }}>🛠 Admin Panel</Text>
-
-      <TextInput
-        placeholder="Product name"
-        value={name}
-        onChangeText={setName}
-        style={{ borderWidth: 1, marginBottom: 10, padding: 10 }}
-      />
-
-      <TextInput
-        placeholder="Price"
-        value={price}
-        onChangeText={setPrice}
-        keyboardType="numeric"
-        style={{ borderWidth: 1, marginBottom: 10, padding: 10 }}
-      />
-
-      <TextInput
-        placeholder="Image URL"
-        value={image}
-        onChangeText={setImage}
-        style={{ borderWidth: 1, marginBottom: 20, padding: 10 }}
-      />
-
-      <Button
-        title={editingId ? "💾 Хадгалах" : "➕ Product нэмэх"}
-        onPress={addProduct}
-      />
-
-      <Text style={{ fontSize: 20, marginTop: 30, marginBottom: 10 }}>
-        Products
+    <View style={{ flex: 1, padding: 20, backgroundColor: "#f5f5f5" }}>
+      <Text style={{ fontSize: 26, fontWeight: "bold", marginBottom: 20 }}>
+        🛠 Admin Panel
       </Text>
+
+      <View
+        style={{
+          backgroundColor: "white",
+          padding: 16,
+          borderRadius: 12,
+          marginBottom: 20
+        }}
+      >
+        <TextInput
+          placeholder="Product name"
+          value={name}
+          onChangeText={setName}
+          style={{ borderWidth: 1, marginBottom: 10, padding: 10, borderRadius: 8 }}
+        />
+
+        <TextInput
+          placeholder="Price"
+          value={price}
+          onChangeText={setPrice}
+          keyboardType="numeric"
+          style={{ borderWidth: 1, marginBottom: 10, padding: 10, borderRadius: 8 }}
+        />
+
+        <TextInput
+          placeholder="Image URL"
+          value={image}
+          onChangeText={setImage}
+          style={{ borderWidth: 1, marginBottom: 10, padding: 10, borderRadius: 8 }}
+        />
+
+        <Button
+          title={editingId ? "💾 Update Product" : "➕ Add Product"}
+          onPress={saveProduct}
+        />
+      </View>
 
       <FlatList
         data={products}
@@ -157,29 +184,44 @@ export default function Admin() {
         renderItem={({ item }) => (
           <View
             style={{
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 15,
-              marginBottom: 10,
+              backgroundColor: "white",
+              borderRadius: 12,
+              marginBottom: 12,
+              overflow: "hidden"
             }}
           >
-            <Text>{item.name}</Text>
-            <Text>{item.price}₮</Text>
+            {item.image ? (
+              <Image
+                source={{ uri: item.image }}
+                style={{ width: "100%", height: 180 }}
+                resizeMode="cover"
+              />
+            ) : null}
 
-            <Button
-              title="✏️ Засах"
-              onPress={() => {
-                setEditingId(item.id);
-                setName(item.name);
-                setPrice(item.price.toString());
-                setImage(item.image || "");
-              }}
-            />
+            <View style={{ padding: 16 }}>
+              <Text style={{ fontSize: 18, fontWeight: "600" }}>{item.name}</Text>
+              <Text style={{ marginTop: 6 }}>{item.price}₮</Text>
 
-            <Button
-              title="❌ Устгах"
-              onPress={() => deleteProduct(item.id)}
-            />
+              <View style={{ marginTop: 12 }}>
+                <Button
+                  title="✏️ Edit"
+                  onPress={() => {
+                    setEditingId(item.id);
+                    setName(item.name);
+                    setPrice(String(item.price));
+                    setImage(item.image || "");
+                  }}
+                />
+              </View>
+
+              <View style={{ marginTop: 10 }}>
+                <Button
+                  title="❌ Delete"
+                  color="#dc2626"
+                  onPress={() => deleteProduct(item.id)}
+                />
+              </View>
+            </View>
           </View>
         )}
       />

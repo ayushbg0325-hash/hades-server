@@ -1,13 +1,17 @@
-import { useState } from "react";
-import { View, Text, TextInput, Button } from "react-native";
-import { router } from "expo-router";
-
 export default function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
+    if (!username || !password) {
+      alert("Бүх талбарыг бөглөнө үү");
+      return;
+    }
+
     try {
+      setLoading(true);
+
       const response = await fetch("https://hades-server.onrender.com/register", {
         method: "POST",
         headers: {
@@ -23,13 +27,15 @@ export default function Register() {
 
       if (data.msg) {
         alert(data.msg);
-        router.push("/");
+        router.replace("/");
       } else {
         alert("Бүртгэл амжилтгүй");
       }
     } catch (error) {
       console.log(error);
       alert("Сервер холбогдохгүй байна");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -54,7 +60,15 @@ export default function Register() {
         style={{ borderWidth: 1, marginBottom: 20, padding: 10, borderRadius: 8 }}
       />
 
-      <Button title="✅ Бүртгүүлэх" onPress={handleRegister} />
+      <Button
+        title={loading ? "Түр хүлээнэ үү..." : "✅ Бүртгүүлэх"}
+        onPress={handleRegister}
+        disabled={loading}
+      />
+
+      <View style={{ marginTop: 10 }}>
+        <Button title="🔐 Нэвтрэх" onPress={() => router.push("/")} />
+      </View>
     </View>
   );
 }
