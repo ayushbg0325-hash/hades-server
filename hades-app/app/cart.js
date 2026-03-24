@@ -39,53 +39,61 @@ export default function Cart() {
   }, []);
 
   const removeFromCart = async (id) => {
-    try {
-      const response = await fetch(`${SERVER_URL}/cart/${id}`, {
-        method: "DELETE"
-      });
+  try {
+    const token = await AsyncStorage.getItem("token");
 
-      const data = await response.json();
-
-      if (data.message) {
-        loadCart();
-      } else {
-        Alert.alert("Алдаа", "Устгаж чадсангүй");
+    const response = await fetch(`${SERVER_URL}/cart/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`
       }
-    } catch (error) {
-      console.log("REMOVE CART ERROR:", error);
-      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
+    });
+
+    const data = await response.json();
+
+    if (data.message) {
+      loadCart();
+    } else {
+      Alert.alert("Алдаа", data.msg || "Устгаж чадсангүй");
     }
-  };
+  } catch (error) {
+    console.log("REMOVE CART ERROR:", error);
+    Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
+  }
+};
 
-  const updateQuantity = async (id, newQuantity) => {
-    if (newQuantity < 1) {
-      removeFromCart(id);
-      return;
+ const updateQuantity = async (id, newQuantity) => {
+  if (newQuantity < 1) {
+    removeFromCart(id);
+    return;
+  }
+
+  try {
+    const token = await AsyncStorage.getItem("token");
+
+    const response = await fetch(`${SERVER_URL}/cart/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        quantity: newQuantity
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.message) {
+      loadCart();
+    } else {
+      Alert.alert("Алдаа", data.msg || "Тоо шинэчилж чадсангүй");
     }
-
-    try {
-      const response = await fetch(`${SERVER_URL}/cart/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          quantity: newQuantity
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.message) {
-        loadCart();
-      } else {
-        Alert.alert("Алдаа", "Тоо шинэчилж чадсангүй");
-      }
-    } catch (error) {
-      console.log("UPDATE CART ERROR:", error);
-      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
-    }
-  };
+  } catch (error) {
+    console.log("UPDATE CART ERROR:", error);
+    Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
+  }
+};
 
   const checkout = async () => {
     try {
