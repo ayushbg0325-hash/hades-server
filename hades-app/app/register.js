@@ -1,3 +1,7 @@
+import { useState } from "react";
+import { View, Text, TextInput, Button } from "react-native";
+import { router } from "expo-router";
+
 export default function Register() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +45,14 @@ export default function Register() {
 
   return (
     <View style={{ flex: 1, padding: 20, justifyContent: "center" }}>
-      <Text style={{ fontSize: 26, fontWeight: "bold", marginBottom: 20, textAlign: "center" }}>
+      <Text
+        style={{
+          fontSize: 26,
+          fontWeight: "bold",
+          marginBottom: 20,
+          textAlign: "center"
+        }}
+      >
         📝 Бүртгүүлэх
       </Text>
 
@@ -49,7 +60,12 @@ export default function Register() {
         placeholder="Username"
         value={username}
         onChangeText={setUsername}
-        style={{ borderWidth: 1, marginBottom: 10, padding: 10, borderRadius: 8 }}
+        style={{
+          borderWidth: 1,
+          marginBottom: 10,
+          padding: 10,
+          borderRadius: 8
+        }}
       />
 
       <TextInput
@@ -57,7 +73,12 @@ export default function Register() {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        style={{ borderWidth: 1, marginBottom: 20, padding: 10, borderRadius: 8 }}
+        style={{
+          borderWidth: 1,
+          marginBottom: 20,
+          padding: 10,
+          borderRadius: 8
+        }}
       />
 
       <Button

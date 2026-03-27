@@ -359,9 +359,17 @@ app.get("/order-details/:orderId", verifyToken, (req, res) => {
   const { orderId } = req.params;
 
   db.query(
-    `SELECT order_items.*, products.name, products.price
+    `SELECT 
+      order_items.*, 
+      products.name, 
+      products.price,
+      orders.user_id,
+      orders.status,
+      orders.total,
+      orders.created_at
      FROM order_items
      JOIN products ON order_items.product_id = products.id
+     JOIN orders ON order_items.order_id = orders.id
      WHERE order_items.order_id = ?`,
     [orderId],
     (err, result) => {
@@ -378,7 +386,18 @@ app.get("/order-details/:orderId", verifyToken, (req, res) => {
 // ------------------- ADMIN ORDERS -------------------
 app.get("/admin/orders", verifyToken, verifyAdmin, (req, res) => {
   db.query(
-    "SELECT * FROM orders ORDER BY created_at DESC",
+    `
+    SELECT 
+      orders.id,
+      orders.user_id,
+      users.username,
+      orders.total,
+      orders.status,
+      orders.created_at
+    FROM orders
+    JOIN users ON orders.user_id = users.id
+    ORDER BY orders.created_at DESC
+    `,
     (err, result) => {
       if (err) {
         console.log("ADMIN ORDERS ERROR:", err);

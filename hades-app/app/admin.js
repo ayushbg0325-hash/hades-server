@@ -1,11 +1,52 @@
 import { useEffect, useState } from "react";
-import { View, Text, TextInput, Button, FlatList, Alert, Image } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  FlatList,
+  Alert,
+  Image,
+  TouchableOpacity,
+  ScrollView
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 
 const SERVER_URL = "https://hades-server.onrender.com";
 
+const getStatusStyle = (status) => {
+  switch (status) {
+    case "paid":
+      return {
+        backgroundColor: "#dbeafe",
+        color: "#1d4ed8",
+        label: "Paid"
+      };
+    case "completed":
+      return {
+        backgroundColor: "#dcfce7",
+        color: "#166534",
+        label: "Completed"
+      };
+    case "cancelled":
+      return {
+        backgroundColor: "#fee2e2",
+        color: "#b91c1c",
+        label: "Cancelled"
+      };
+    case "pending":
+    default:
+      return {
+        backgroundColor: "#fef3c7",
+        color: "#92400e",
+        label: "Pending"
+      };
+  }
+};
+
 export default function Admin() {
+  const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -46,8 +87,28 @@ export default function Admin() {
       setProducts(Array.isArray(data) ? data : []);
     } catch (error) {
       console.log("LOAD PRODUCTS ERROR:", error);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+
+      const response = await fetch(`${SERVER_URL}/admin/orders`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      console.log("ADMIN ORDERS STATUS:", response.status);
+
+      const data = await response.json();
+      console.log("ADMIN ORDERS DATA:", data);
+
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.log("LOAD ADMIN ORDERS ERROR:", error);
+      Alert.alert("Алдаа", "Захиалгуудыг уншиж чадсангүй");
     }
   };
 
@@ -55,8 +116,10 @@ export default function Admin() {
     const init = async () => {
       const ok = await checkAdmin();
       if (ok) {
-        loadProducts();
+        await loadProducts();
+        await loadOrders();
       }
+      setLoading(false);
     };
 
     init();
@@ -88,7 +151,10 @@ export default function Admin() {
       const data = await response.json();
 
       if (data.message) {
-        Alert.alert("Амжилттай", editingId ? "Product шинэчлэгдлээ" : "Product нэмэгдлээ");
+        Alert.alert(
+          "Амжилттай",
+          editingId ? "Product шинэчлэгдлээ" : "Product нэмэгдлээ"
+        );
         setName("");
         setPrice("");
         setImage("");
@@ -100,6 +166,35 @@ export default function Admin() {
     } catch (error) {
       console.log("SAVE PRODUCT ERROR:", error);
       Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
+    }
+  };
+
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+
+      const response = await fetch(`${SERVER_URL}/admin/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: newStatus
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.message) {
+        Alert.alert("Амжилттай", data.message);
+        loadOrders();
+      } else {
+        Alert.alert("Алдаа", data.msg || "Status өөрчилж чадсангүй");
+      }
+    } catch (error) {
+      console.log("UPDATE ORDER STATUS ERROR:", error);
+      Alert.alert("Алдаа", "Status update хийхэд алдаа гарлаа");
     }
   };
 
@@ -137,7 +232,7 @@ export default function Admin() {
   }
 
   return (
-    <View style={{ flex: 1, padding: 20, backgroundColor: "#f5f5f5" }}>
+    <ScrollView style={{ flex: 1, padding: 20, backgroundColor: "#f5f5f5" }}>
       <Text style={{ fontSize: 26, fontWeight: "bold", marginBottom: 20 }}>
         🛠 Admin Panel
       </Text>
@@ -178,8 +273,99 @@ export default function Admin() {
         />
       </View>
 
+      <View
+        style={{
+          backgroundColor: "white",
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 20
+        }}
+      >
+        <Text style={{ fontSize: 22, fontWeight: "700", marginBottom: 12 }}>
+          📦 Хэрэглэгчдийн захиалга
+        </Text>
+
+        <Text style={{ marginBottom: 12, color: "#6b7280" }}>
+          Нийт захиалга: {orders.length}
+        </Text>
+
+        {orders.length === 0 ? (
+          <Text style={{ color: "#6b7280" }}>Захиалга алга байна</Text>
+        ) : (
+          orders.map((order) => (
+            <TouchableOpacity
+              key={order.id}
+              onPress={() =>
+                router.push({
+                  pathname: "/order-details",
+                  params: { orderId: String(order.id) }
+                })
+              }
+              style={{
+                backgroundColor: "#f9fafb",
+                borderRadius: 10,
+                padding: 12,
+                marginBottom: 12
+              }}
+            >
+              <Text style={{ fontWeight: "700", marginBottom: 6 }}>
+                Order #{order.id}
+              </Text>
+
+              <Text>User ID: {order.user_id}</Text>
+<Text>Username: {order.username}</Text>
+<Text>Нийт дүн: {order.total}₮</Text>
+<Text style={{ marginBottom: 8 }}>Огноо: {order.created_at}</Text>
+
+              <View
+                style={{
+                  alignSelf: "flex-start",
+                  backgroundColor: getStatusStyle(order.status || "pending").backgroundColor,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  marginBottom: 10
+                }}
+              >
+                <Text
+                  style={{
+                    color: getStatusStyle(order.status || "pending").color,
+                    fontWeight: "700"
+                  }}
+                >
+                  {getStatusStyle(order.status || "pending").label}
+                </Text>
+              </View>
+
+              <View style={{ marginBottom: 8 }}>
+                <Button
+                  title="✅ Батлах"
+                  onPress={() => updateOrderStatus(order.id, "paid")}
+                />
+              </View>
+
+              <View style={{ marginBottom: 8 }}>
+                <Button
+                  title="📦 Дуусгах"
+                  onPress={() => updateOrderStatus(order.id, "completed")}
+                />
+              </View>
+
+              <View>
+                <Button
+                  title="❌ Цуцлах"
+                  color="#dc2626"
+                  onPress={() => updateOrderStatus(order.id, "cancelled")}
+                />
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+
       <FlatList
         data={products}
+        scrollEnabled={false}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
           <View
@@ -225,6 +411,6 @@ export default function Admin() {
           </View>
         )}
       />
-    </View>
+    </ScrollView>
   );
 }
