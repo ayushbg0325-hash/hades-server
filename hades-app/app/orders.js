@@ -10,26 +10,26 @@ const getStatusStyle = (status) => {
       return {
         backgroundColor: "#dbeafe",
         color: "#1d4ed8",
-        label: "Paid"
+        label: "Төлбөр авсан"
       };
     case "completed":
       return {
         backgroundColor: "#dcfce7",
         color: "#166534",
-        label: "Completed"
+        label: "Дууссан"
       };
     case "cancelled":
       return {
         backgroundColor: "#fee2e2",
         color: "#b91c1c",
-        label: "Cancelled"
+        label: "Цуцалсан"
       };
     case "pending":
     default:
       return {
         backgroundColor: "#fef3c7",
         color: "#92400e",
-        label: "Pending"
+        label: "Төлбөр хүлээгдэж байна"
       };
   }
 };

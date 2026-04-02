@@ -24,6 +24,8 @@
     console.log("LOGIN RESPONSE:", data);
 
     if (data.token) {
+      const payload = JSON.parse(atob(data.token.split(".")[1]));
+console.log("LOGIN USER:", payload);
       await AsyncStorage.setItem("token", data.token);
 
       const savedToken = await AsyncStorage.getItem("token");

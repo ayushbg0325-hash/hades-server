@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 
 const SERVER_URL = "https://hades-server.onrender.com";
 
@@ -21,28 +22,50 @@ const getStatusStyle = (status) => {
       return {
         backgroundColor: "#dbeafe",
         color: "#1d4ed8",
-        label: "Paid"
+        label: "Төлбөр авсан"
       };
     case "completed":
       return {
         backgroundColor: "#dcfce7",
         color: "#166534",
-        label: "Completed"
+        label: "Дууссан"
       };
     case "cancelled":
       return {
         backgroundColor: "#fee2e2",
         color: "#b91c1c",
-        label: "Cancelled"
+        label: "Цуцалсан"
       };
     case "pending":
     default:
       return {
         backgroundColor: "#fef3c7",
         color: "#92400e",
-        label: "Pending"
+        label: "Төлбөр хүлээгдэж байна"
       };
   }
+};
+
+const summaryCard = {
+  width: "31%",
+  backgroundColor: "#f9fafb",
+  borderRadius: 14,
+  padding: 14,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: "#e5e7eb"
+};
+
+const summaryLabel = {
+  fontSize: 13,
+  color: "#6b7280",
+  marginBottom: 8
+};
+
+const summaryValue = {
+  fontSize: 20,
+  fontWeight: "700",
+  color: "#111827"
 };
 
 export default function Admin() {
@@ -53,6 +76,10 @@ export default function Admin() {
   const [image, setImage] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchText, setSearchText] = useState("");
+  const [dateFilter, setDateFilter] = useState("all");
 
   const checkAdmin = async () => {
     try {
@@ -112,18 +139,21 @@ export default function Admin() {
     }
   };
 
-  useEffect(() => {
-    const init = async () => {
-      const ok = await checkAdmin();
-      if (ok) {
-        await loadProducts();
-        await loadOrders();
-      }
-      setLoading(false);
-    };
+  useFocusEffect(
+    useCallback(() => {
+      const init = async () => {
+        setLoading(true);
+        const ok = await checkAdmin();
+        if (ok) {
+          await loadProducts();
+          await loadOrders();
+        }
+        setLoading(false);
+      };
 
-    init();
-  }, []);
+      init();
+    }, [])
+  );
 
   const saveProduct = async () => {
     try {
@@ -223,6 +253,62 @@ export default function Admin() {
     }
   };
 
+  const filteredOrders = orders
+    .filter((order) => {
+      if (statusFilter === "all") return true;
+      return (order.status || "pending") === statusFilter;
+    })
+    .filter((order) => {
+      if (!searchText.trim()) return true;
+
+      const q = searchText.toLowerCase();
+
+      return (
+        String(order.id).includes(q) ||
+        String(order.user_id).includes(q) ||
+        String(order.username || "").toLowerCase().includes(q)
+      );
+    })
+    .filter((order) => {
+      if (dateFilter === "all") return true;
+
+      const created = new Date(order.created_at);
+      const now = new Date();
+
+      if (dateFilter === "today") {
+        return created.toDateString() === now.toDateString();
+      }
+
+      if (dateFilter === "7days") {
+        const diff = now - created;
+        const days = diff / (1000 * 60 * 60 * 24);
+        return days <= 7;
+      }
+
+      return true;
+    });
+
+  const totalRevenue = filteredOrders.reduce(
+    (sum, order) => sum + Number(order.total || 0),
+    0
+  );
+
+  const pendingCount = filteredOrders.filter(
+    (o) => (o.status || "pending") === "pending"
+  ).length;
+
+  const paidCount = filteredOrders.filter(
+    (o) => (o.status || "pending") === "paid"
+  ).length;
+
+  const completedCount = filteredOrders.filter(
+    (o) => (o.status || "pending") === "completed"
+  ).length;
+
+  const cancelledCount = filteredOrders.filter(
+    (o) => (o.status || "pending") === "cancelled"
+  ).length;
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -236,6 +322,17 @@ export default function Admin() {
       <Text style={{ fontSize: 26, fontWeight: "bold", marginBottom: 20 }}>
         🛠 Admin Panel
       </Text>
+
+      <View style={{ marginBottom: 16 }}>
+        <Button
+          title="🔄 Захиалга refresh"
+          onPress={async () => {
+            setLoading(true);
+            await loadOrders();
+            setLoading(false);
+          }}
+        />
+      </View>
 
       <View
         style={{
@@ -285,14 +382,283 @@ export default function Admin() {
           📦 Хэрэглэгчдийн захиалга
         </Text>
 
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            marginBottom: 16
+          }}
+        >
+          <View style={summaryCard}>
+            <Text style={summaryLabel}>Нийт order</Text>
+            <Text style={summaryValue}>{filteredOrders.length}</Text>
+          </View>
+
+          <View style={summaryCard}>
+            <Text style={summaryLabel}>Нийт дүн</Text>
+            <Text style={summaryValue}>{totalRevenue}₮</Text>
+          </View>
+
+          <View style={summaryCard}>
+            <Text style={summaryLabel}>Pending</Text>
+            <Text style={summaryValue}>{pendingCount}</Text>
+          </View>
+
+          <View style={summaryCard}>
+            <Text style={summaryLabel}>Paid</Text>
+            <Text style={summaryValue}>{paidCount}</Text>
+          </View>
+
+          <View style={summaryCard}>
+            <Text style={summaryLabel}>Completed</Text>
+            <Text style={summaryValue}>{completedCount}</Text>
+          </View>
+
+          <View style={summaryCard}>
+            <Text style={summaryLabel}>Cancelled</Text>
+            <Text style={summaryValue}>{cancelledCount}</Text>
+          </View>
+        </View>
+
+        <View
+          style={{
+            backgroundColor: "white",
+            borderRadius: 14,
+            padding: 12,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: "#e5e7eb"
+          }}
+        >
+          <TextInput
+            placeholder="Order ID, User ID, Username хайх..."
+            value={searchText}
+            onChangeText={setSearchText}
+            style={{ fontSize: 16 }}
+          />
+        </View>
+
+        <View
+          style={{
+            backgroundColor: "white",
+            borderRadius: 16,
+            padding: 8,
+            marginBottom: 16,
+            shadowColor: "#000",
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 3 },
+            elevation: 2
+          }}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setDateFilter("all")}
+              style={{
+                backgroundColor: dateFilter === "all" ? "#111827" : "#f3f4f6",
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 999
+              }}
+            >
+              <Text
+                style={{
+                  color: dateFilter === "all" ? "#fff" : "#111827",
+                  fontWeight: "700"
+                }}
+              >
+                Бүх огноо
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setDateFilter("today")}
+              style={{
+                backgroundColor: dateFilter === "today" ? "#2563eb" : "#eff6ff",
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 999
+              }}
+            >
+              <Text
+                style={{
+                  color: dateFilter === "today" ? "#fff" : "#1d4ed8",
+                  fontWeight: "700"
+                }}
+              >
+                Өнөөдөр
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setDateFilter("7days")}
+              style={{
+                backgroundColor: dateFilter === "7days" ? "#16a34a" : "#f0fdf4",
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 999
+              }}
+            >
+              <Text
+                style={{
+                  color: dateFilter === "7days" ? "#fff" : "#166534",
+                  fontWeight: "700"
+                }}
+              >
+                Сүүлийн 7 хоног
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+
+        <View
+          style={{
+            backgroundColor: "white",
+            borderRadius: 16,
+            padding: 8,
+            marginBottom: 16,
+            shadowColor: "#000",
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 3 },
+            elevation: 2
+          }}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setStatusFilter("all")}
+              style={{
+                backgroundColor: statusFilter === "all" ? "#111827" : "#f3f4f6",
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 999,
+                minWidth: 90,
+                alignItems: "center"
+              }}
+            >
+              <Text
+                style={{
+                  color: statusFilter === "all" ? "#fff" : "#111827",
+                  fontWeight: "700"
+                }}
+              >
+                ⚫ Бүгд
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setStatusFilter("pending")}
+              style={{
+                backgroundColor: statusFilter === "pending" ? "#dc2626" : "#fef2f2",
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 999,
+                minWidth: 100,
+                alignItems: "center"
+              }}
+            >
+              <Text
+                style={{
+                  color: statusFilter === "pending" ? "#fff" : "#b91c1c",
+                  fontWeight: "700"
+                }}
+              >
+                🔴 Pending
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setStatusFilter("paid")}
+              style={{
+                backgroundColor: statusFilter === "paid" ? "#2563eb" : "#eff6ff",
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 999,
+                minWidth: 90,
+                alignItems: "center"
+              }}
+            >
+              <Text
+                style={{
+                  color: statusFilter === "paid" ? "#fff" : "#1d4ed8",
+                  fontWeight: "700"
+                }}
+              >
+                🔵 Paid
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setStatusFilter("completed")}
+              style={{
+                backgroundColor: statusFilter === "completed" ? "#16a34a" : "#f0fdf4",
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 999,
+                minWidth: 120,
+                alignItems: "center"
+              }}
+            >
+              <Text
+                style={{
+                  color: statusFilter === "completed" ? "#fff" : "#166534",
+                  fontWeight: "700"
+                }}
+              >
+                🟢 Completed
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setStatusFilter("cancelled")}
+              style={{
+                backgroundColor: statusFilter === "cancelled" ? "#7f1d1d" : "#fef2f2",
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 999,
+                minWidth: 110,
+                alignItems: "center"
+              }}
+            >
+              <Text
+                style={{
+                  color: statusFilter === "cancelled" ? "#fff" : "#991b1b",
+                  fontWeight: "700"
+                }}
+              >
+                ❌ Cancelled
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+
         <Text style={{ marginBottom: 12, color: "#6b7280" }}>
           Нийт захиалга: {orders.length}
         </Text>
 
-        {orders.length === 0 ? (
-          <Text style={{ color: "#6b7280" }}>Захиалга алга байна</Text>
+        {filteredOrders.length === 0 ? (
+          <Text style={{ color: "#6b7280" }}>
+            Тохирох захиалга олдсонгүй
+          </Text>
         ) : (
-          orders.map((order) => (
+          filteredOrders.map((order) => (
             <TouchableOpacity
               key={order.id}
               onPress={() =>
@@ -313,9 +679,11 @@ export default function Admin() {
               </Text>
 
               <Text>User ID: {order.user_id}</Text>
-<Text>Username: {order.username}</Text>
-<Text>Нийт дүн: {order.total}₮</Text>
-<Text style={{ marginBottom: 8 }}>Огноо: {order.created_at}</Text>
+              <Text>Username: {order.username}</Text>
+              <Text>Нийт дүн: {order.total}₮</Text>
+              <Text style={{ marginBottom: 8 }}>
+                Огноо: {order.created_at}
+              </Text>
 
               <View
                 style={{
@@ -339,7 +707,7 @@ export default function Admin() {
 
               <View style={{ marginBottom: 8 }}>
                 <Button
-                  title="✅ Батлах"
+                  title="💳 Төлбөр авсан"
                   onPress={() => updateOrderStatus(order.id, "paid")}
                 />
               </View>

@@ -6,12 +6,43 @@ import {
   Button,
   Image,
   ScrollView,
-  Alert
+  Alert,
+  TouchableOpacity
 } from "react-native";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SERVER_URL = "https://hades-server.onrender.com";
+
+const getStatusStyle = (status) => {
+  switch (status) {
+    case "paid":
+      return {
+        backgroundColor: "#dbeafe",
+        color: "#1d4ed8",
+        label: "Төлбөр авсан"
+      };
+    case "completed":
+      return {
+        backgroundColor: "#dcfce7",
+        color: "#166534",
+        label: "Дууссан"
+      };
+    case "cancelled":
+      return {
+        backgroundColor: "#fee2e2",
+        color: "#b91c1c",
+        label: "Цуцалсан"
+      };
+    case "pending":
+    default:
+      return {
+        backgroundColor: "#fef3c7",
+        color: "#92400e",
+        label: "Төлбөр хүлээгдэж байна"
+      };
+  }
+};
 
 export default function Dashboard() {
   const [products, setProducts] = useState([]);
@@ -19,10 +50,14 @@ export default function Dashboard() {
   const [cartItems, setCartItems] = useState([]);
   const [orders, setOrders] = useState([]);
   const [adminStats, setAdminStats] = useState(null);
+  const [adminOrders, setAdminOrders] = useState([]);
+  const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadDashboard = async () => {
     try {
+      setLoading(true);
+
       const token = await AsyncStorage.getItem("token");
 
       if (!token) {
@@ -38,6 +73,13 @@ export default function Dashboard() {
         }
       });
       const profileData = await profileRes.json();
+
+      if (!profileRes.ok || !profileData.user) {
+        Alert.alert("Алдаа", profileData.msg || "Profile уншиж чадсангүй");
+        router.replace("/");
+        return;
+      }
+
       setProfile(profileData.user);
 
       // 2. Products
@@ -54,7 +96,7 @@ export default function Dashboard() {
       const cartData = await cartRes.json();
       setCartItems(Array.isArray(cartData) ? cartData : []);
 
-      // 4. Orders
+      // 4. Миний orders
       const ordersRes = await fetch(`${SERVER_URL}/orders/${profileData.user.id}`, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -63,7 +105,7 @@ export default function Dashboard() {
       const ordersData = await ordersRes.json();
       setOrders(Array.isArray(ordersData) ? ordersData : []);
 
-      // 5. Admin stats (admin user бол)
+      // 5. Admin data
       if (profileData.user.role === "admin") {
         const statsRes = await fetch(`${SERVER_URL}/admin/stats`, {
           headers: {
@@ -72,6 +114,26 @@ export default function Dashboard() {
         });
         const statsData = await statsRes.json();
         setAdminStats(statsData);
+
+        const adminOrdersRes = await fetch(`${SERVER_URL}/admin/orders`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        const adminOrdersData = await adminOrdersRes.json();
+        setAdminOrders(Array.isArray(adminOrdersData) ? adminOrdersData : []);
+
+        const chartRes = await fetch(`${SERVER_URL}/admin/revenue-chart`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        const chartJson = await chartRes.json();
+        setChartData(Array.isArray(chartJson) ? chartJson : []);
+      } else {
+        setAdminStats(null);
+        setAdminOrders([]);
+        setChartData([]);
       }
     } catch (error) {
       console.log("DASHBOARD ERROR:", error);
@@ -121,6 +183,15 @@ export default function Dashboard() {
     }
   };
 
+  const pendingAdminOrders = adminOrders.filter(
+    (o) => (o.status || "pending") === "pending"
+  );
+
+  const myTotalAmount = orders.reduce(
+    (sum, order) => sum + Number(order.total || 0),
+    0
+  );
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -145,20 +216,45 @@ export default function Dashboard() {
 
         {/* USER INFO */}
         <View
-          style={{
-            backgroundColor: "white",
-            borderRadius: 14,
-            padding: 16,
-            marginBottom: 16
-          }}
-        >
-          <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 10 }}>
-            👤 Хэрэглэгчийн мэдээлэл
-          </Text>
-          <Text>Username: {profile?.username}</Text>
-          <Text>User ID: {profile?.id}</Text>
-          <Text>Role: {profile?.role}</Text>
-        </View>
+  style={{
+    backgroundColor: "white",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16
+  }}
+>
+  <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 10 }}>
+    👤 Одоогоор нэвтэрсэн хэрэглэгч
+  </Text>
+
+  <Text style={{ marginBottom: 6 }}>
+    Username: {profile?.username}
+  </Text>
+
+  <Text style={{ marginBottom: 6 }}>
+    User ID: {profile?.id}
+  </Text>
+
+  <View
+    style={{
+      alignSelf: "flex-start",
+      backgroundColor: profile?.role === "admin" ? "#fee2e2" : "#dbeafe",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+      marginTop: 6
+    }}
+  >
+    <Text
+      style={{
+        color: profile?.role === "admin" ? "#b91c1c" : "#1d4ed8",
+        fontWeight: "700"
+      }}
+    >
+      {profile?.role === "admin" ? "ADMIN" : "USER"}
+    </Text>
+  </View>
+</View>
 
         {/* QUICK ACTIONS */}
         <View style={{ marginBottom: 16 }}>
@@ -178,6 +274,10 @@ export default function Dashboard() {
 
           <View style={{ marginBottom: 10 }}>
             <Button title="👤 Profile" onPress={() => router.push("/profile")} />
+          </View>
+
+          <View style={{ marginBottom: 10 }}>
+            <Button title="🔄 Refresh" onPress={loadDashboard} />
           </View>
         </View>
 
@@ -204,6 +304,11 @@ export default function Dashboard() {
             <Text style={statTitle}>Миний захиалга</Text>
             <Text style={statValue}>{orders.length}</Text>
           </View>
+
+          <View style={statCard}>
+            <Text style={statTitle}>Миний нийт дүн</Text>
+            <Text style={statValueSmall}>{myTotalAmount}₮</Text>
+          </View>
         </View>
 
         {/* ADMIN STATS */}
@@ -227,111 +332,176 @@ export default function Dashboard() {
               📈 Admin статистик
             </Text>
 
-            <View style={{ marginBottom: 8 }}>
-              <Text style={{ color: "#d1d5db" }}>
-                Нийт захиалга: {adminStats.totalOrders}
-              </Text>
-            </View>
-
-            <View style={{ marginBottom: 8 }}>
-              <Text style={{ color: "#d1d5db" }}>
-                Нийт орлого: {adminStats.totalRevenue || 0}₮
-              </Text>
-            </View>
-
-            <View>
-              <Text style={{ color: "#d1d5db" }}>
-                Хүлээгдэж буй захиалга: {adminStats.pendingOrders}
-              </Text>
-            </View>
+            <Text style={{ color: "#d1d5db", marginBottom: 8 }}>
+              Нийт захиалга: {adminStats.totalOrders}
+            </Text>
+            <Text style={{ color: "#d1d5db", marginBottom: 8 }}>
+              Нийт орлого: {adminStats.totalRevenue || 0}₮
+            </Text>
+            <Text style={{ color: "#d1d5db", marginBottom: 8 }}>
+              Хүлээгдэж буй захиалга: {adminStats.pendingOrders}
+            </Text>
+            <Text style={{ color: "#d1d5db" }}>
+              Бүх хэрэглэгчийн захиалга: {adminOrders.length}
+            </Text>
           </View>
         )}
-{/* MY ORDERS LIST */}
-<View
-  style={{
-    backgroundColor: "white",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16
-  }}
->
-  <Text
-    style={{
-      fontSize: 20,
-      fontWeight: "700",
-      marginBottom: 12
-    }}
-  >
-    📦 Миний захиалгууд
-  </Text>
 
-  {orders.length === 0 ? (
-    <Text style={{ color: "#6b7280" }}>Захиалга алга байна</Text>
-  ) : (
-    orders.slice(0, 5).map((order) => (
-      <View
-        key={order.id}
-        style={{
-          backgroundColor: "#f9fafb",
-          borderRadius: 10,
-          padding: 12,
-          marginBottom: 10
-        }}
-      >
-        <Text style={{ fontWeight: "700" }}>Order #{order.id}</Text>
-        <Text>Нийт дүн: {order.total}₮</Text>
-        <Text>Төлөв: {order.status || "pending"}</Text>
-        <Text>Огноо: {order.created_at}</Text>
-      </View>
-    ))
-  )}
-</View>
-
-{/* PENDING ORDERS LIST - ADMIN ONLY */}
-{profile?.role === "admin" && (
-  <View
-    style={{
-      backgroundColor: "white",
-      borderRadius: 14,
-      padding: 16,
-      marginBottom: 16
-    }}
-  >
-    <Text
-      style={{
-        fontSize: 20,
-        fontWeight: "700",
-        marginBottom: 12
-      }}
-    >
-      ⏳ Хүлээгдэж буй захиалгууд
-    </Text>
-
-    {orders.filter((o) => (o.status || "pending") === "pending").length === 0 ? (
-      <Text style={{ color: "#6b7280" }}>Хүлээгдэж буй захиалга алга байна</Text>
-    ) : (
-      orders
-        .filter((o) => (o.status || "pending") === "pending")
-        .slice(0, 5)
-        .map((order) => (
+        {/* REVENUE CHART LIST */}
+        {profile?.role === "admin" && chartData.length > 0 && (
           <View
-            key={order.id}
             style={{
-              backgroundColor: "#fff7ed",
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 10
+              backgroundColor: "white",
+              borderRadius: 14,
+              padding: 16,
+              marginBottom: 16
             }}
           >
-            <Text style={{ fontWeight: "700" }}>Order #{order.id}</Text>
-            <Text>Нийт дүн: {order.total}₮</Text>
-            <Text>Төлөв: {order.status || "pending"}</Text>
-            <Text>Огноо: {order.created_at}</Text>
+            <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 12 }}>
+              📈 Орлогын график
+            </Text>
+
+            {chartData.map((item, index) => (
+              <View
+                key={index}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  paddingVertical: 8,
+                  borderBottomWidth: index === chartData.length - 1 ? 0 : 1,
+                  borderBottomColor: "#e5e7eb"
+                }}
+              >
+                <Text>{item.day}</Text>
+                <Text style={{ fontWeight: "700" }}>{item.revenue}₮</Text>
+              </View>
+            ))}
           </View>
-        ))
-    )}
-  </View>
-)}
+        )}
+
+        {/* MY RECENT ORDERS */}
+        <View
+          style={{
+            backgroundColor: "white",
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 16
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: "700",
+              marginBottom: 12
+            }}
+          >
+            📦 Миний сүүлийн захиалгууд
+          </Text>
+
+          {orders.length === 0 ? (
+            <Text style={{ color: "#6b7280" }}>Захиалга алга байна</Text>
+          ) : (
+            orders.slice(0, 5).map((order) => (
+              <TouchableOpacity
+                key={order.id}
+                onPress={() =>
+                  router.push({
+                    pathname: "/order-details",
+                    params: { orderId: String(order.id) }
+                  })
+                }
+                style={{
+                  backgroundColor: "#f9fafb",
+                  borderRadius: 10,
+                  padding: 12,
+                  marginBottom: 10
+                }}
+              >
+                <Text style={{ fontWeight: "700", marginBottom: 6 }}>
+                  Order #{order.id}
+                </Text>
+
+                <View
+                  style={{
+                    alignSelf: "flex-start",
+                    backgroundColor: getStatusStyle(order.status || "pending").backgroundColor,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 999,
+                    marginBottom: 8
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: getStatusStyle(order.status || "pending").color,
+                      fontWeight: "700"
+                    }}
+                  >
+                    {getStatusStyle(order.status || "pending").label}
+                  </Text>
+                </View>
+
+                <Text>Нийт дүн: {order.total}₮</Text>
+                <Text>Огноо: {order.created_at}</Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
+        {/* ADMIN PENDING ORDERS */}
+        {profile?.role === "admin" && (
+          <View
+            style={{
+              backgroundColor: "white",
+              borderRadius: 14,
+              padding: 16,
+              marginBottom: 16
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: "700",
+                marginBottom: 12
+              }}
+            >
+              ⏳ Хүлээгдэж буй бүх захиалгууд
+            </Text>
+
+            {pendingAdminOrders.length === 0 ? (
+              <Text style={{ color: "#6b7280" }}>
+                Хүлээгдэж буй захиалга алга байна
+              </Text>
+            ) : (
+              pendingAdminOrders.slice(0, 5).map((order) => (
+                <TouchableOpacity
+                  key={order.id}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/order-details",
+                      params: { orderId: String(order.id) }
+                    })
+                  }
+                  style={{
+                    backgroundColor: "#fff7ed",
+                    borderRadius: 10,
+                    padding: 12,
+                    marginBottom: 10
+                  }}
+                >
+                  <Text style={{ fontWeight: "700", marginBottom: 6 }}>
+                    Order #{order.id}
+                  </Text>
+                  <Text>User ID: {order.user_id}</Text>
+                  <Text>Username: {order.username}</Text>
+                  <Text>Нийт дүн: {order.total}₮</Text>
+                  <Text>Огноо: {order.created_at}</Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
+
         {/* PRODUCTS */}
         <Text
           style={{
@@ -405,7 +575,7 @@ export default function Dashboard() {
 }
 
 const statCard = {
-  width: "31%",
+  width: "48%",
   backgroundColor: "white",
   borderRadius: 12,
   padding: 14,
@@ -420,5 +590,10 @@ const statTitle = {
 
 const statValue = {
   fontSize: 24,
+  fontWeight: "bold"
+};
+
+const statValueSmall = {
+  fontSize: 18,
   fontWeight: "bold"
 };

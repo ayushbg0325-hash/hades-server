@@ -56,6 +56,41 @@ export default function Profile() {
           marginBottom: 20
         }}
       >
+        <View
+  style={{
+    backgroundColor: "#f9fafb",
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20
+  }}
+>
+  <Text style={{ fontSize: 18, marginBottom: 10 }}>
+    Username: {user.username}
+  </Text>
+
+  <Text style={{ fontSize: 18, marginBottom: 10 }}>
+    User ID: {user.id}
+  </Text>
+
+  <View
+    style={{
+      alignSelf: "flex-start",
+      backgroundColor: user.role === "admin" ? "#fee2e2" : "#dbeafe",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999
+    }}
+  >
+    <Text
+      style={{
+        color: user.role === "admin" ? "#b91c1c" : "#1d4ed8",
+        fontWeight: "700"
+      }}
+    >
+      {user.role === "admin" ? "ADMIN" : "USER"}
+    </Text>
+  </View>
+</View>
         <Text style={{ fontSize: 18, marginBottom: 10 }}>
           Username: {user.username}
         </Text>

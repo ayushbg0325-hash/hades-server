@@ -4,35 +4,37 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, router } from "expo-router";
 
 const SERVER_URL = "https://hades-server.onrender.com";
+
 const getStatusStyle = (status) => {
   switch (status) {
     case "paid":
       return {
         backgroundColor: "#dbeafe",
         color: "#1d4ed8",
-        label: "Paid"
+        label: "Төлбөр авсан"
       };
     case "completed":
       return {
         backgroundColor: "#dcfce7",
         color: "#166534",
-        label: "Completed"
+        label: "Дууссан"
       };
     case "cancelled":
       return {
         backgroundColor: "#fee2e2",
         color: "#b91c1c",
-        label: "Cancelled"
+        label: "Цуцалсан"
       };
     case "pending":
     default:
       return {
         backgroundColor: "#fef3c7",
         color: "#92400e",
-        label: "Pending"
+        label: "Төлбөр хүлээгдэж байна"
       };
   }
 };
+
 export default function OrderDetails() {
   const { orderId } = useLocalSearchParams();
 
@@ -43,9 +45,10 @@ export default function OrderDetails() {
   const loadOrderDetails = async () => {
     try {
       if (!orderId) {
-  Alert.alert("Алдаа", "Order ID олдсонгүй");
-  return;
-}
+        Alert.alert("Алдаа", "Order ID олдсонгүй");
+        return;
+      }
+
       const token = await AsyncStorage.getItem("token");
 
       if (!token) {
@@ -54,7 +57,6 @@ export default function OrderDetails() {
         return;
       }
 
-      // 1. profile авах
       const profileRes = await fetch(`${SERVER_URL}/profile`, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -72,27 +74,24 @@ export default function OrderDetails() {
 
       setProfile(profileData.user);
 
-      // 2. order detail авах
       let detailsRes;
 
-if (profileData.user.role === "admin") {
-  detailsRes = await fetch(`${SERVER_URL}/admin/orders/${orderId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-} else {
-  detailsRes = await fetch(`${SERVER_URL}/order-details/${orderId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-}
+      if (profileData.user.role === "admin") {
+        detailsRes = await fetch(`${SERVER_URL}/admin/orders/${orderId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      } else {
+        detailsRes = await fetch(`${SERVER_URL}/order-details/${orderId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      }
 
-const detailsData = await detailsRes.json();
-console.log("ORDER DETAILS:", detailsData);
-
-setItems(Array.isArray(detailsData) ? detailsData : []);
+      const detailsData = await detailsRes.json();
+      console.log("ORDER DETAILS:", detailsData);
 
       setItems(Array.isArray(detailsData) ? detailsData : []);
     } catch (error) {
@@ -179,28 +178,35 @@ setItems(Array.isArray(detailsData) ? detailsData : []);
             <Text style={{ marginBottom: 6 }}>
               User ID: {items[0].user_id}
             </Text>
+
             <View
-  style={{
-    alignSelf: "flex-start",
-    backgroundColor: getStatusStyle(items[0].status || "pending").backgroundColor,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 10
-  }}
->
-  <Text
-    style={{
-      color: getStatusStyle(items[0].status || "pending").color,
-      fontWeight: "700"
-    }}
-  >
-    {getStatusStyle(items[0].status || "pending").label}
-  </Text>
-</View>
+              style={{
+                alignSelf: "flex-start",
+                backgroundColor: getStatusStyle(items[0].status || "pending").backgroundColor,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 999,
+                marginBottom: 10
+              }}
+            >
+              <Text
+                style={{
+                  color: getStatusStyle(items[0].status || "pending").color,
+                  fontWeight: "700"
+                }}
+              >
+                {getStatusStyle(items[0].status || "pending").label}
+              </Text>
+            </View>
+
+            <Text style={{ marginBottom: 8, fontWeight: "600" }}>
+              Төлбөрийн төлөв: {getStatusStyle(items[0].status || "pending").label}
+            </Text>
+
             <Text style={{ marginBottom: 6 }}>
               Огноо: {items[0].created_at}
             </Text>
+
             <Text style={{ fontWeight: "700" }}>
               Нийт дүн: {items[0].total || totalPrice}₮
             </Text>
@@ -210,7 +216,6 @@ setItems(Array.isArray(detailsData) ? detailsData : []);
         )}
       </View>
 
-      {/* ADMIN STATUS BUTTONS */}
       {profile?.role === "admin" && (
         <View
           style={{
@@ -232,11 +237,11 @@ setItems(Array.isArray(detailsData) ? detailsData : []);
           </Text>
 
           <View style={{ marginBottom: 10 }}>
-            <Button title="✅ Батлах (paid)" onPress={() => updateStatus("paid")} />
+            <Button title="💳 Төлбөр авсан" onPress={() => updateStatus("paid")} />
           </View>
 
           <View style={{ marginBottom: 10 }}>
-            <Button title="📦 Дуусгах (completed)" onPress={() => updateStatus("completed")} />
+            <Button title="📦 Дуусгах" onPress={() => updateStatus("completed")} />
           </View>
 
           <View style={{ marginBottom: 10 }}>
@@ -244,7 +249,7 @@ setItems(Array.isArray(detailsData) ? detailsData : []);
           </View>
 
           <View>
-            <Button title="❌ Цуцлах (cancelled)" color="#dc2626" onPress={() => updateStatus("cancelled")} />
+            <Button title="❌ Цуцлах" color="#dc2626" onPress={() => updateStatus("cancelled")} />
           </View>
         </View>
       )}
