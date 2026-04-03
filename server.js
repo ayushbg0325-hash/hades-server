@@ -290,37 +290,71 @@ app.post("/checkout", verifyToken, (req, res) => {
   const userId = req.user.id;
 
   db.query(
-    "SELECT * FROM cart WHERE user_id = ?",
+    `SELECT 
+      cart.product_id,
+      cart.quantity,
+      products.price
+     FROM cart
+     JOIN products ON cart.product_id = products.id
+     WHERE cart.user_id = ?`,
     [userId],
     (err, cartItems) => {
-      if (err) return res.status(500).json({ msg: "DB алдаа" });
+      if (err) {
+        console.log("CHECKOUT ERROR:", err);
+        return res.status(500).json({ msg: "DB алдаа", error: err.message });
+      }
 
       if (!cartItems.length) {
         return res.status(400).json({ msg: "Сагс хоосон байна" });
       }
 
       const total = cartItems.reduce(
-        (sum, item) => sum + item.price * item.quantity,
+        (sum, item) => sum + Number(item.price) * Number(item.quantity),
         0
       );
 
-      // ORDER үүсгэнэ (pending)
       db.query(
         "INSERT INTO orders (user_id, total, status) VALUES (?, ?, ?)",
         [userId, total, "pending"],
         (err, result) => {
-          if (err) return res.status(500).json({ msg: "Order үүсгэхэд алдаа" });
+          if (err) {
+            console.log("ORDER INSERT ERROR:", err);
+            return res.status(500).json({ msg: "Order үүсгэхэд алдаа", error: err.message });
+          }
 
           const orderId = result.insertId;
 
-          // cart цэвэрлэнэ
-          db.query("DELETE FROM cart WHERE user_id = ?", [userId]);
+          let inserted = 0;
 
-          return res.json({
-            message: "Захиалга үүсгэлээ",
-            order_id: orderId,
-            total_price: total,
-            status: "pending"
+          cartItems.forEach((item) => {
+            db.query(
+              "INSERT INTO order_items (order_id, product_id, quantity) VALUES (?, ?, ?)",
+              [orderId, item.product_id, item.quantity],
+              (itemErr) => {
+                if (itemErr) {
+                  console.log("ORDER ITEM INSERT ERROR:", itemErr);
+                  return res.status(500).json({ msg: "Order item хадгалахад алдаа", error: itemErr.message });
+                }
+
+                inserted += 1;
+
+                if (inserted === cartItems.length) {
+                  db.query("DELETE FROM cart WHERE user_id = ?", [userId], (deleteErr) => {
+                    if (deleteErr) {
+                      console.log("CART CLEAR ERROR:", deleteErr);
+                      return res.status(500).json({ msg: "Cart цэвэрлэхэд алдаа", error: deleteErr.message });
+                    }
+
+                    return res.json({
+                      message: "Захиалга үүсгэлээ",
+                      order_id: orderId,
+                      total_price: total,
+                      status: "pending"
+                    });
+                  });
+                }
+              }
+            );
           });
         }
       );
