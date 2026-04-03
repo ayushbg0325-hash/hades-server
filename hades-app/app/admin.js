@@ -680,6 +680,8 @@ export default function Admin() {
 
               <Text>User ID: {order.user_id}</Text>
               <Text>Username: {order.username}</Text>
+              <Text>Төлбөрийн төрөл: {order.payment_method || "Сонгоогүй"}</Text>
+<Text>Тайлбар: {order.payment_note || "-"}</Text>
               <Text>Нийт дүн: {order.total}₮</Text>
               <Text style={{ marginBottom: 8 }}>
                 Огноо: {order.created_at}

@@ -287,78 +287,40 @@ app.delete("/cart/:id", verifyToken, (req, res) => {
 
 // ------------------- CHECKOUT -------------------
 app.post("/checkout", verifyToken, (req, res) => {
-  const user_id = req.user.id;
+  const userId = req.user.id;
 
   db.query(
-    `SELECT cart.*, products.price
-     FROM cart
-     JOIN products ON cart.product_id = products.id
-     WHERE cart.user_id = ?`,
-    [user_id],
-    (err, items) => {
-      if (err) {
-        console.log("CHECKOUT ERROR:", err);
-        return res.status(500).json({ error: err.message });
-      }
+    "SELECT * FROM cart WHERE user_id = ?",
+    [userId],
+    (err, cartItems) => {
+      if (err) return res.status(500).json({ msg: "DB алдаа" });
 
-      if (!items || items.length === 0) {
+      if (!cartItems.length) {
         return res.status(400).json({ msg: "Сагс хоосон байна" });
       }
 
-      const total = items.reduce(
-        (sum, item) => sum + Number(item.price) * Number(item.quantity),
+      const total = cartItems.reduce(
+        (sum, item) => sum + item.price * item.quantity,
         0
       );
 
+      // ORDER үүсгэнэ (pending)
       db.query(
         "INSERT INTO orders (user_id, total, status) VALUES (?, ?, ?)",
-        [user_id, total, "pending"],
-        (orderErr, orderResult) => {
-          if (orderErr) {
-            console.log("ORDER INSERT ERROR:", orderErr);
-            return res.status(500).json({ error: orderErr.message });
-          }
+        [userId, total, "pending"],
+        (err, result) => {
+          if (err) return res.status(500).json({ msg: "Order үүсгэхэд алдаа" });
 
-          const orderId = orderResult.insertId;
-          let inserted = 0;
-          let hasItemInsertError = false;
+          const orderId = result.insertId;
 
-          items.forEach((item) => {
-            db.query(
-              "INSERT INTO order_items (order_id, product_id, quantity) VALUES (?, ?, ?)",
-              [orderId, item.product_id, item.quantity],
-              (itemErr) => {
-                if (hasItemInsertError) return;
+          // cart цэвэрлэнэ
+          db.query("DELETE FROM cart WHERE user_id = ?", [userId]);
 
-                if (itemErr) {
-                  hasItemInsertError = true;
-                  console.log("ORDER ITEM INSERT ERROR:", itemErr);
-                  return res.status(500).json({ error: itemErr.message });
-                }
-
-                inserted += 1;
-
-                if (inserted === items.length) {
-                  db.query(
-                    "DELETE FROM cart WHERE user_id = ?",
-                    [user_id],
-                    (deleteErr) => {
-                      if (deleteErr) {
-                        console.log("CART CLEAR ERROR:", deleteErr);
-                        return res.status(500).json({ error: deleteErr.message });
-                      }
-
-                      return res.json({
-                        message: "Захиалга үүсгэлээ. Төлбөрөө үргэлжлүүлнэ үү",
-                        order_id: orderId,
-                        total_price: total,
-                        status: "pending"
-                      });
-                    }
-                  );
-                }
-              }
-            );
+          return res.json({
+            message: "Захиалга үүсгэлээ",
+            order_id: orderId,
+            total_price: total,
+            status: "pending"
           });
         }
       );
@@ -511,6 +473,30 @@ app.put("/payments/order/:orderId/mark-paid", verifyToken, (req, res) => {
   );
 });
 
+// ------------------- PAYMENT METHOD -------------------
+app.put("/orders/:orderId/payment", verifyToken, (req, res) => {
+  const { orderId } = req.params;
+  const { payment_method, payment_note } = req.body;
+
+  if (!payment_method) {
+    return res.status(400).json({ msg: "payment_method шаардлагатай" });
+  }
+
+  db.query(
+    `UPDATE orders 
+     SET payment_method = ?, payment_note = ?
+     WHERE id = ? AND user_id = ?`,
+    [payment_method, payment_note || "", orderId, req.user.id],
+    (err) => {
+      if (err) {
+        console.log("PAYMENT METHOD UPDATE ERROR:", err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.json({ message: "Төлбөрийн төрөл хадгалагдлаа" });
+    }
+  );
+});
 // ------------------- ORDERS -------------------
 app.get("/orders", verifyToken, (req, res) => {
   db.query(
@@ -549,14 +535,15 @@ app.get("/order-details/:orderId", verifyToken, (req, res) => {
 
   db.query(
     `SELECT 
-      order_items.*, 
-      products.name, 
+      order_items.*,
+      products.name,
       products.price,
-      products.image,
       orders.user_id,
       orders.status,
       orders.total,
-      orders.created_at
+      orders.created_at,
+      orders.payment_method,
+      orders.payment_note
      FROM order_items
      JOIN products ON order_items.product_id = products.id
      JOIN orders ON order_items.order_id = orders.id
@@ -568,7 +555,7 @@ app.get("/order-details/:orderId", verifyToken, (req, res) => {
         return res.status(500).json({ error: err.message });
       }
 
-      return res.json(result);
+      res.json(result);
     }
   );
 });
@@ -577,13 +564,15 @@ app.get("/order-details/:orderId", verifyToken, (req, res) => {
 app.get("/admin/orders", verifyToken, verifyAdmin, (req, res) => {
   db.query(
     `
-    SELECT 
+    SELECT
       orders.id,
       orders.user_id,
       users.username,
       orders.total,
       orders.status,
-      orders.created_at
+      orders.created_at,
+      orders.payment_method,
+      orders.payment_note
     FROM orders
     JOIN users ON orders.user_id = users.id
     ORDER BY orders.created_at DESC
@@ -594,7 +583,7 @@ app.get("/admin/orders", verifyToken, verifyAdmin, (req, res) => {
         return res.status(500).json({ error: err.message });
       }
 
-      return res.json(result);
+      res.json(result);
     }
   );
 });
@@ -603,7 +592,7 @@ app.get("/admin/orders/:id", verifyToken, verifyAdmin, (req, res) => {
   const { id } = req.params;
 
   db.query(
-    `SELECT 
+    `SELECT
       order_items.id,
       order_items.quantity,
       products.name,
@@ -611,7 +600,9 @@ app.get("/admin/orders/:id", verifyToken, verifyAdmin, (req, res) => {
       orders.total,
       orders.user_id,
       orders.created_at,
-      orders.status
+      orders.status,
+      orders.payment_method,
+      orders.payment_note
      FROM order_items
      JOIN products ON order_items.product_id = products.id
      JOIN orders ON order_items.order_id = orders.id
@@ -623,7 +614,7 @@ app.get("/admin/orders/:id", verifyToken, verifyAdmin, (req, res) => {
         return res.status(500).json({ error: err.message });
       }
 
-      return res.json(result);
+      res.json(result);
     }
   );
 });

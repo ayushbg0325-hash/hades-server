@@ -211,11 +211,18 @@ export default function OrderDetails() {
               Нийт дүн: {items[0].total || totalPrice}₮
             </Text>
           </>
+          
         ) : (
           <Text>Дэлгэрэнгүй мэдээлэл алга байна</Text>
         )}
       </View>
+<Text style={{ marginBottom: 6 }}>
+  Төлбөрийн төрөл: {items[0]?.payment_method || "Сонгоогүй"}
+</Text>
 
+<Text style={{ marginBottom: 6 }}>
+  Тайлбар: {items[0]?.payment_note || "-"}
+</Text>
       {profile?.role === "admin" && (
         <View
           style={{
