@@ -124,9 +124,12 @@ export default function Cart() {
 
       if (response.ok && data.order_id) {
         router.push({
-          pathname: "/payment",
-          params: { orderId: String(data.order_id) }
-        });
+  pathname: "/payment",
+  params: {
+    orderId: String(data.order_id),
+    totalPrice: String(data.total_price)
+  }
+});
       } else {
         Alert.alert("Алдаа", data.msg || "Захиалга үүсгэж чадсангүй");
       }

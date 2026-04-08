@@ -305,6 +305,9 @@ export default function OrderDetails() {
             <Text style={{ fontWeight: "700" }}>
               Нийлбэр: {Number(item.price) * Number(item.quantity)}₮
             </Text>
+            <Text style={{ marginBottom: 8, fontWeight: "600" }}>
+  Төлбөрийн төлөв: {getStatusStyle(items[0]?.status || "pending").label}
+</Text>
           </View>
         )}
       />

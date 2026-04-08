@@ -23,8 +23,18 @@ app.get("/", (req, res) => {
 });
 
 // ------------------- DB CONNECTION -------------------
-const db = mysql.createConnection(process.env.MYSQL_PUBLIC_URL);
-
+//const db = mysql.createConnection(process.env.MYSQL_PUBLIC_URL);
+const mysql = requ("mysql2");
+const db = mysql.createConnection({
+  host: process.env.MYSQLHOST,
+  port: process.env.MYSQLPORT,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
 db.connect((err) => {
   if (err) {
     console.error("DB холболт алдаа:", err);
