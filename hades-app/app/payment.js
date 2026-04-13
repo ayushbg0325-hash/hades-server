@@ -11,11 +11,10 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, router } from "expo-router";
 
-const SERVER_URL = "https://hades-server.onrender.com";
+import { API_URL as SERVER_URL } from "../constants/api";
 
 export default function PaymentScreen() {
   const { orderId, totalPrice } = useLocalSearchParams();
-
   const [selectedMethod, setSelectedMethod] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -24,7 +23,7 @@ export default function PaymentScreen() {
 
   useEffect(() => {
     if (!orderId) {
-      Alert.alert("Алдаа", "Order ID олдсонгүй");
+      Alert.alert("Error", "Order ID not found");
       router.back();
     }
   }, [orderId]);
@@ -37,7 +36,7 @@ export default function PaymentScreen() {
 
   const savePaymentMethod = async () => {
     if (!selectedMethod) {
-      Alert.alert("Анхаар", "Төлбөрийн аргаа сонгоно уу");
+      Alert.alert("Warning", "Choose a payment method first");
       return;
     }
 
@@ -45,9 +44,8 @@ export default function PaymentScreen() {
       setSaving(true);
 
       const token = await AsyncStorage.getItem("token");
-
       if (!token) {
-        Alert.alert("Алдаа", "Нэвтрээгүй байна");
+        Alert.alert("Error", "You are not logged in");
         return;
       }
 
@@ -64,26 +62,22 @@ export default function PaymentScreen() {
       });
 
       const data = await response.json();
-      console.log("SAVE PAYMENT METHOD RESPONSE:", data);
-
       if (data.message) {
-        Alert.alert(
-          "Амжилттай",
-          "Төлбөрийн мэдээлэл хадгалагдлаа. Admin шалгаад төлбөрийг баталгаажуулна."
-        );
+        Alert.alert("Success", "Payment information saved");
         router.replace("/orders");
-      } else {
-        Alert.alert("Алдаа", data.msg || "Хадгалж чадсангүй");
+        return;
       }
+
+      Alert.alert("Error", data.msg || "Could not save payment details");
     } catch (error) {
       console.log("SAVE PAYMENT METHOD ERROR:", error);
-      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
+      Alert.alert("Error", "Could not connect to the server");
     } finally {
       setSaving(false);
     }
   };
 
-  const MethodCard = ({ icon, title, subtitle, value, isActive, onPress }) => (
+  const MethodCard = ({ icon, title, subtitle, isActive, onPress }) => (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.9}
@@ -171,7 +165,7 @@ export default function PaymentScreen() {
             marginBottom: 16
           }}
         >
-          💳 Төлбөрийн сонголт
+          Payment Method
         </Text>
 
         <View
@@ -188,17 +182,12 @@ export default function PaymentScreen() {
           }}
         >
           <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 10 }}>
-            Захиалгын мэдээлэл
+            Order Summary
           </Text>
-
+          <Text style={{ color: "#374151", marginBottom: 6 }}>Order ID: {orderId}</Text>
           <Text style={{ color: "#374151", marginBottom: 6 }}>
-            Order ID: {orderId}
+            Total: {totalPrice ? `${totalPrice}₮` : "Check the order list for the total"}
           </Text>
-
-          <Text style={{ color: "#374151", marginBottom: 6 }}>
-            Нийт дүн: {totalPrice ? `${totalPrice}₮` : "Orders дээрээс шалгана"}
-          </Text>
-
           <View
             style={{
               alignSelf: "flex-start",
@@ -209,9 +198,7 @@ export default function PaymentScreen() {
               borderRadius: 999
             }}
           >
-            <Text style={{ color: "#92400e", fontWeight: "700" }}>
-              Төлбөр хүлээгдэж байна
-            </Text>
+            <Text style={{ color: "#92400e", fontWeight: "700" }}>Awaiting payment review</Text>
           </View>
         </View>
 
@@ -223,14 +210,13 @@ export default function PaymentScreen() {
             marginBottom: 12
           }}
         >
-          Төлбөрийн аргаа сонгоно уу
+          Select payment method
         </Text>
 
         <MethodCard
           icon="💵"
           title="Cash"
-          subtitle="Касс дээр бэлэн мөнгөөр төлнө. Admin мөнгө авсны дараа төлбөрийг баталгаажуулна."
-          value="cash"
+          subtitle="Pay in cash when the order is handed over."
           isActive={selectedMethod === "cash"}
           onPress={() => setSelectedMethod("cash")}
         />
@@ -238,8 +224,7 @@ export default function PaymentScreen() {
         <MethodCard
           icon="🏦"
           title="Bank transfer"
-          subtitle="Дансаар шилжүүлэг хийнэ. Гүйлгээний утгаа зөв бичээд дараа нь сонголтоо хадгална."
-          value="bank_transfer"
+          subtitle="Transfer to the account below and keep the transfer reference."
           isActive={selectedMethod === "bank_transfer"}
           onPress={() => setSelectedMethod("bank_transfer")}
         />
@@ -255,13 +240,9 @@ export default function PaymentScreen() {
               borderColor: "#bae6fd"
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 10 }}>
-              💵 Cash төлбөр
-            </Text>
-
+            <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 10 }}>Cash payment</Text>
             <Text style={{ color: "#0f172a", lineHeight: 22 }}>
-              Та касс дээр бэлэн мөнгөөр төлнө. Захиалга "Төлбөр хүлээгдэж байна"
-              төлөвтэй үлдэнэ. Admin мөнгө авсны дараа "Төлбөр авсан" болгоно.
+              Your order will remain in pending status until an admin confirms payment was received.
             </Text>
           </View>
         )}
@@ -281,20 +262,13 @@ export default function PaymentScreen() {
             }}
           >
             <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 12 }}>
-              🏦 Дансны мэдээлэл
+              Bank details
             </Text>
-
-            <Text style={{ marginBottom: 8, color: "#374151" }}>
-              Банк: Khan Bank
-            </Text>
-            <Text style={{ marginBottom: 8, color: "#374151" }}>
-              Данс: 1234567890
-            </Text>
-            <Text style={{ marginBottom: 8, color: "#374151" }}>
-              Нэр: Hades Store
-            </Text>
+            <Text style={{ marginBottom: 8, color: "#374151" }}>Bank: Khan Bank</Text>
+            <Text style={{ marginBottom: 8, color: "#374151" }}>Account: 1234567890</Text>
+            <Text style={{ marginBottom: 8, color: "#374151" }}>Name: Hades Store</Text>
             <Text style={{ marginBottom: 14, color: "#374151", fontWeight: "700" }}>
-              Гүйлгээний утга: {paymentRef}
+              Reference: {paymentRef}
             </Text>
 
             <Text
@@ -305,11 +279,11 @@ export default function PaymentScreen() {
                 color: "#111827"
               }}
             >
-              Тайлбар / гүйлгээний утга
+              Transfer note
             </Text>
 
             <TextInput
-              placeholder="Жишээ: ORDER-39 / овог нэр"
+              placeholder="Example: ORDER-39 / your name"
               value={note}
               onChangeText={setNote}
               style={{
@@ -345,7 +319,7 @@ export default function PaymentScreen() {
                 fontWeight: "800"
               }}
             >
-              ✅ Сонголтоо хадгалах
+              Save selection
             </Text>
           )}
         </TouchableOpacity>
@@ -367,13 +341,10 @@ export default function PaymentScreen() {
               marginBottom: 10
             }}
           >
-            Анхааруулга
+            Important
           </Text>
-
           <Text style={{ color: "#7c2d12", lineHeight: 22 }}>
-            Төлбөрийн аргаа сонгосны дараа захиалга "Төлбөр хүлээгдэж байна"
-            төлөвтэй үлдэнэ. Admin мөнгө орсныг эсвэл бэлэн мөнгө авснаа шалгаад
-            "Төлбөр авсан" болгоно.
+            After you choose a payment method, the order stays pending until an admin verifies it.
           </Text>
         </View>
       </View>

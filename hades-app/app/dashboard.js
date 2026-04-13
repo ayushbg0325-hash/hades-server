@@ -11,8 +11,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const SERVER_URL = "https://hades-server.onrender.com";
+import { API_URL as SERVER_URL } from "../constants/api";
 
 const getStatusStyle = (status) => {
   switch (status) {

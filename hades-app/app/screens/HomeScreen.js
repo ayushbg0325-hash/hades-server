@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Button, Alert, StyleSheet } from "react-native";
+import { View, TextInput, Button, Alert, StyleSheet } from "react-native";
 
 export default function HomeScreen() {
   const [username, setUsername] = useState("");

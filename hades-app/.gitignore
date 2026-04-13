@@ -2,7 +2,6 @@
 
 # dependencies
 .env
-.env.*
 node_modules/
 # Expo
 .expo/

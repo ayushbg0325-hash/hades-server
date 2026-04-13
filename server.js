@@ -3,44 +3,63 @@ require("dotenv").config();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const express = require("express");
-const mysql = require("mysql2");
 const cors = require("cors");
 const axios = require("axios");
-
+const mysql = require("mysql2");
 const app = express();
-
+console.log("HOST:", process.env.MYSQLHOST);
 app.use(express.json());
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"]
-  })
-);
+const corsOptions = {
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "ngrok-skip-browser-warning"
+  ]
+};
 
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.get("/", (req, res) => {
   res.send("API ажиллаж байна 🚀");
 });
-
 // ------------------- DB CONNECTION -------------------
 //const db = mysql.createConnection(process.env.MYSQL_PUBLIC_URL);
-const mysql = requ("mysql2");
-const db = mysql.createConnection({
-  host: process.env.MYSQLHOST,
-  port: process.env.MYSQLPORT,
-  user: process.env.MYSQLUSER,
-  password: process.env.MYSQLPASSWORD,
-  database: process.env.MYSQLDATABASE,
-  ssl: {
-    rejectUnauthorized: false
+//
+let db;
+
+try {
+  db = mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "",
+    database: "hades"
+  });
+
+  db.connect(err => {
+    if (err) {
+      console.log("DB холболт алдаа:", err.message);
+    } else {
+      console.log("DB амжилттай холбогдлоо");
+    }
+  });
+
+} catch (e) {
+  console.log("DB skip хийлээ");
+}
+app.use((req, res, next) => {
+  if (req.path === "/") {
+    next();
+    return;
   }
-});
-db.connect((err) => {
-  if (err) {
-    console.error("DB холболт алдаа:", err);
-  } else {
-    console.log("DB амжилттай холбогдлоо");
+
+  if (!db) {
+    res.status(500).json({ msg: "Database connection is not available" });
+    return;
   }
+
+  next();
 });
 
 // ------------------- JWT SECRET -------------------
@@ -106,40 +125,69 @@ app.post("/register", async (req, res) => {
 
 // ------------------- LOGIN -------------------
 app.post("/login", (req, res) => {
-  const { username, password } = req.body;
+  try {
+    const { username, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ msg: "Username ба password оруулна уу" });
-  }
+    console.log("LOGIN BODY:", req.body);
 
-  db.query(
-    "SELECT * FROM users WHERE username = ?",
-    [username],
-    async (err, results) => {
-      if (err) {
-        return res.status(500).json({ msg: "DB алдаа", error: err.message });
-      }
-
-      if (results.length === 0) {
-        return res.status(401).json({ msg: "Хэрэглэгч олдсонгүй" });
-      }
-
-      const user = results[0];
-      const isMatch = await bcrypt.compare(password, user.password);
-
-      if (!isMatch) {
-        return res.status(401).json({ msg: "Нууц үг буруу" });
-      }
-
-      const token = jwt.sign(
-        { id: user.id, username: user.username, role: user.role },
-        JWT_SECRET,
-        { expiresIn: "1h" }
-      );
-
-      return res.json({ token });
+    if (!username || !password) {
+      return res.status(400).json({ msg: "Username ба password оруулна уу" });
     }
-  );
+
+    if (!db) {
+      return res.status(500).json({ msg: "DB холбогдоогүй байна" });
+    }
+
+    db.query(
+      "SELECT * FROM users WHERE username = ? LIMIT 1",
+      [username],
+      async (err, results) => {
+        if (err) {
+          console.log("LOGIN DB ERROR:", err);
+          return res.status(500).json({ msg: "DB алдаа", error: err.message });
+        }
+
+        if (!results || results.length === 0) {
+          return res.status(401).json({ msg: "Хэрэглэгч олдсонгүй" });
+        }
+
+        const user = results[0];
+        console.log("LOGIN USER:", user);
+
+        try {
+          const isMatch = await bcrypt.compare(password, user.password);
+
+          if (!isMatch) {
+            return res.status(401).json({ msg: "Нууц үг буруу" });
+          }
+
+          const token = jwt.sign(
+            {
+              id: user.id,
+              username: user.username,
+              role: user.role || "user"
+            },
+            JWT_SECRET,
+            { expiresIn: "7d" }
+          );
+
+          return res.json({ token });
+        } catch (bcryptErr) {
+          console.log("BCRYPT ERROR:", bcryptErr);
+          return res.status(500).json({
+            msg: "Password шалгах үед алдаа гарлаа",
+            error: bcryptErr.message
+          });
+        }
+      }
+    );
+  } catch (error) {
+    console.log("LOGIN OUTER ERROR:", error);
+    return res.status(500).json({
+      msg: "Login route алдаа",
+      error: error.message
+    });
+  }
 });
 
 // ------------------- PROFILE -------------------
@@ -723,8 +771,25 @@ app.get("/admin/revenue-chart", verifyToken, verifyAdmin, (req, res) => {
 });
 
 // ------------------- START SERVER -------------------
-const PORT = process.env.PORT || 3000;
+const DEFAULT_PORT = Number(process.env.PORT) || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Server ${PORT} порт дээр ажиллаж байна`);
-});
+const startServer = (port, allowFallback = true) => {
+  const server = app.listen(port, () => {
+    console.log("Server " + port + " port deer ajillaj baina");
+  });
+
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE" && allowFallback) {
+      const nextPort = port + 1;
+      console.log("Port " + port + " already in use. Retrying on " + nextPort + "...");
+      startServer(nextPort, false);
+      return;
+    }
+
+    console.error("SERVER START ERROR:", error);
+    process.exit(1);
+  });
+};
+
+startServer(DEFAULT_PORT);
+

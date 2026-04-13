@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, FlatList, Alert, TouchableOpacity } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-
-const SERVER_URL = "https://hades-server.onrender.com";
+import { API_URL as SERVER_URL } from "../constants/api";
 const getStatusStyle = (status) => {
   switch (status) {
     case "paid":

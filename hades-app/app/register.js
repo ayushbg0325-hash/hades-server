@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View, Text, TextInput, Button } from "react-native";
 import { router } from "expo-router";
+import { API_URL } from "../constants/api";
 
 export default function Register() {
   const [username, setUsername] = useState("");
@@ -16,7 +17,7 @@ export default function Register() {
     try {
       setLoading(true);
 
-      const response = await fetch("https://hades-server.onrender.com/register", {
+      const response = await fetch(`${API_URL}/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, Text, FlatList, Alert, Button, ScrollView } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, router } from "expo-router";
-
-const SERVER_URL = "https://hades-server.onrender.com";
+import { API_URL as SERVER_URL } from "../constants/api";
 
 const getStatusStyle = (status) => {
   switch (status) {
@@ -42,7 +41,7 @@ export default function OrderDetails() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const loadOrderDetails = async () => {
+  const loadOrderDetails = useCallback(async () => {
     try {
       if (!orderId) {
         Alert.alert("Алдаа", "Order ID олдсонгүй");
@@ -100,11 +99,11 @@ export default function OrderDetails() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId]);
 
   useEffect(() => {
     loadOrderDetails();
-  }, [orderId]);
+  }, [loadOrderDetails]);
 
   const updateStatus = async (newStatus) => {
     try {

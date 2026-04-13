@@ -13,8 +13,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-
-const SERVER_URL = "https://hades-server.onrender.com";
+import { API_URL as SERVER_URL } from "../constants/api";
 
 const getStatusStyle = (status) => {
   switch (status) {
@@ -91,9 +90,21 @@ export default function Admin() {
         return false;
       }
 
-      const payload = JSON.parse(atob(token.split(".")[1]));
+      const response = await fetch(`${SERVER_URL}/profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
 
-      if (payload.role !== "admin") {
+      const data = await response.json();
+
+      if (!response.ok || !data.user) {
+        Alert.alert("Алдаа", data.msg || "Profile уншиж чадсангүй");
+        router.replace("/");
+        return false;
+      }
+
+      if (data.user.role !== "admin") {
         Alert.alert("Алдаа", "Admin эрхгүй байна");
         router.replace("/dashboard");
         return false;
@@ -784,3 +795,4 @@ export default function Admin() {
     </ScrollView>
   );
 }
+

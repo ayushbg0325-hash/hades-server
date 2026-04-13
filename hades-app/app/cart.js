@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, FlatList, Button, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-
-const SERVER_URL = "https://hades-server.onrender.com";
+import { API_URL as SERVER_URL } from "../constants/api";
 
 export default function Cart() {
   const [cartItems, setCartItems] = useState([]);

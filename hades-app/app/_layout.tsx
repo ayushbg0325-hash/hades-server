@@ -1,17 +1,18 @@
-import { Tabs } from "expo-router";
+import { Stack } from "expo-router";
 
 export default function Layout() {
   return (
-    <Tabs>
-      <Tabs.Screen name="dashboard" options={{ title: "Products" }} />
-      <Tabs.Screen name="cart" options={{ title: "Cart" }} />
-      <Tabs.Screen name="orders" options={{ title: "Orders" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
-      <Tabs.Screen name="admin" options={{ href: null }} />
-      <Tabs.Screen name="screens/HomeScreen" options={{   href: null}}/>
-      <Tabs.Screen name="register" options={{ href: null }} />
-      <Tabs.Screen name="modal" options={{ href: null }} />
-<Tabs.Screen name="(tabs)" options={{ href: null }} />
-    </Tabs>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="register" />
+      <Stack.Screen name="dashboard" />
+      <Stack.Screen name="cart" />
+      <Stack.Screen name="orders" />
+      <Stack.Screen name="order-details" />
+      <Stack.Screen name="payment" />
+      <Stack.Screen name="profile" />
+      <Stack.Screen name="admin" />
+      <Stack.Screen name="modal" />
+    </Stack>
   );
 }
