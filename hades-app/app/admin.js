@@ -1,70 +1,30 @@
 import { useState, useCallback } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Button,
-  FlatList,
+  ActivityIndicator,
   Alert,
   Image,
+  ScrollView,
+  Text,
+  TextInput,
   TouchableOpacity,
-  ScrollView
+  View
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { API_URL as SERVER_URL } from "../constants/api";
 
-const getStatusStyle = (status) => {
-  switch (status) {
-    case "paid":
-      return {
-        backgroundColor: "#dbeafe",
-        color: "#1d4ed8",
-        label: "Төлбөр авсан"
-      };
-    case "completed":
-      return {
-        backgroundColor: "#dcfce7",
-        color: "#166534",
-        label: "Дууссан"
-      };
-    case "cancelled":
-      return {
-        backgroundColor: "#fee2e2",
-        color: "#b91c1c",
-        label: "Цуцалсан"
-      };
-    case "pending":
-    default:
-      return {
-        backgroundColor: "#fef3c7",
-        color: "#92400e",
-        label: "Төлбөр хүлээгдэж байна"
-      };
-  }
-};
+import { API_URL as SERVER_URL } from "../constants/api";
+import { getStatusStyle } from "../constants/order-status";
+import { card, colors, content, formatCurrency, formatDate, input, screen } from "../constants/ui";
 
 const summaryCard = {
-  width: "31%",
-  backgroundColor: "#f9fafb",
-  borderRadius: 14,
+  width: "48%",
+  backgroundColor: "#fffdf9",
+  borderRadius: 18,
   padding: 14,
   marginBottom: 12,
   borderWidth: 1,
-  borderColor: "#e5e7eb"
-};
-
-const summaryLabel = {
-  fontSize: 13,
-  color: "#6b7280",
-  marginBottom: 8
-};
-
-const summaryValue = {
-  fontSize: 20,
-  fontWeight: "700",
-  color: "#111827"
+  borderColor: colors.border
 };
 
 export default function Admin() {
@@ -75,7 +35,6 @@ export default function Admin() {
   const [image, setImage] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
-
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchText, setSearchText] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
@@ -83,29 +42,17 @@ export default function Admin() {
   const checkAdmin = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
-
       if (!token) {
-        Alert.alert("Алдаа", "Нэвтрээгүй байна");
         router.replace("/");
         return false;
       }
 
       const response = await fetch(`${SERVER_URL}/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-
       const data = await response.json();
 
-      if (!response.ok || !data.user) {
-        Alert.alert("Алдаа", data.msg || "Profile уншиж чадсангүй");
-        router.replace("/");
-        return false;
-      }
-
-      if (data.user.role !== "admin") {
-        Alert.alert("Алдаа", "Admin эрхгүй байна");
+      if (!response.ok || !data.user || data.user.role !== "admin") {
         router.replace("/dashboard");
         return false;
       }
@@ -131,22 +78,14 @@ export default function Admin() {
   const loadOrders = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
-
       const response = await fetch(`${SERVER_URL}/admin/orders`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-
-      console.log("ADMIN ORDERS STATUS:", response.status);
-
       const data = await response.json();
-      console.log("ADMIN ORDERS DATA:", data);
-
       setOrders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.log("LOAD ADMIN ORDERS ERROR:", error);
-      Alert.alert("Алдаа", "Захиалгуудыг уншиж чадсангүй");
+      Alert.alert("Алдаа", "Захиалгуудыг ачаалж чадсангүй.");
     }
   };
 
@@ -169,11 +108,7 @@ export default function Admin() {
   const saveProduct = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
-
-      const url = editingId
-        ? `${SERVER_URL}/products/${editingId}`
-        : `${SERVER_URL}/products`;
-
+      const url = editingId ? `${SERVER_URL}/products/${editingId}` : `${SERVER_URL}/products`;
       const method = editingId ? "PUT" : "POST";
 
       const response = await fetch(url, {
@@ -188,92 +123,75 @@ export default function Admin() {
           image
         })
       });
-
       const data = await response.json();
 
-      if (data.message) {
-        Alert.alert(
-          "Амжилттай",
-          editingId ? "Product шинэчлэгдлээ" : "Product нэмэгдлээ"
-        );
+      if (response.ok && data.message) {
         setName("");
         setPrice("");
         setImage("");
         setEditingId(null);
         loadProducts();
-      } else {
-        Alert.alert("Алдаа", data.msg || "Алдаа гарлаа");
+        return;
       }
+
+      Alert.alert("Алдаа", data.msg || "Бараа хадгалах үед алдаа гарлаа.");
     } catch (error) {
       console.log("SAVE PRODUCT ERROR:", error);
-      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
+      Alert.alert("Алдаа", "Сервертэй холбогдсонгүй.");
     }
   };
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       const token = await AsyncStorage.getItem("token");
-
       const response = await fetch(`${SERVER_URL}/admin/orders/${orderId}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          status: newStatus
-        })
+        body: JSON.stringify({ status: newStatus })
       });
-
       const data = await response.json();
 
-      if (data.message) {
-        Alert.alert("Амжилттай", data.message);
+      if (response.ok && data.message) {
         loadOrders();
-      } else {
-        Alert.alert("Алдаа", data.msg || "Status өөрчилж чадсангүй");
+        return;
       }
+
+      Alert.alert("Алдаа", data.msg || "Захиалгын төлөв шинэчилж чадсангүй.");
     } catch (error) {
       console.log("UPDATE ORDER STATUS ERROR:", error);
-      Alert.alert("Алдаа", "Status update хийхэд алдаа гарлаа");
+      Alert.alert("Алдаа", "Төлөв шинэчлэх үед асуудал гарлаа.");
     }
   };
 
   const deleteProduct = async (id) => {
     try {
       const token = await AsyncStorage.getItem("token");
-
       const response = await fetch(`${SERVER_URL}/products/${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-
       const data = await response.json();
 
-      if (data.message) {
-        Alert.alert("Амжилттай", "Product устгалаа");
+      if (response.ok && data.message) {
         loadProducts();
-      } else {
-        Alert.alert("Алдаа", "Устгаж чадсангүй");
+        return;
       }
+
+      Alert.alert("Алдаа", data.msg || "Барааг устгаж чадсангүй.");
     } catch (error) {
       console.log("DELETE PRODUCT ERROR:", error);
-      Alert.alert("Алдаа", "Сервер холбогдохгүй байна");
+      Alert.alert("Алдаа", "Сервертэй холбогдсонгүй.");
     }
   };
 
   const filteredOrders = orders
-    .filter((order) => {
-      if (statusFilter === "all") return true;
-      return (order.status || "pending") === statusFilter;
-    })
+    .filter((order) => (statusFilter === "all" ? true : (order.status || "pending") === statusFilter))
     .filter((order) => {
       if (!searchText.trim()) return true;
-
       const q = searchText.toLowerCase();
-
       return (
         String(order.id).includes(q) ||
         String(order.user_id).includes(q) ||
@@ -282,517 +200,297 @@ export default function Admin() {
     })
     .filter((order) => {
       if (dateFilter === "all") return true;
-
       const created = new Date(order.created_at);
       const now = new Date();
-
-      if (dateFilter === "today") {
-        return created.toDateString() === now.toDateString();
-      }
-
-      if (dateFilter === "7days") {
-        const diff = now - created;
-        const days = diff / (1000 * 60 * 60 * 24);
-        return days <= 7;
-      }
-
+      if (dateFilter === "today") return created.toDateString() === now.toDateString();
+      if (dateFilter === "7days") return (now - created) / (1000 * 60 * 60 * 24) <= 7;
       return true;
     });
 
-  const totalRevenue = filteredOrders.reduce(
-    (sum, order) => sum + Number(order.total || 0),
-    0
-  );
-
-  const pendingCount = filteredOrders.filter(
-    (o) => (o.status || "pending") === "pending"
-  ).length;
-
-  const paidCount = filteredOrders.filter(
-    (o) => (o.status || "pending") === "paid"
-  ).length;
-
-  const completedCount = filteredOrders.filter(
-    (o) => (o.status || "pending") === "completed"
-  ).length;
-
-  const cancelledCount = filteredOrders.filter(
-    (o) => (o.status || "pending") === "cancelled"
-  ).length;
+  const summary = {
+    total: filteredOrders.length,
+    revenue: filteredOrders.reduce((sum, order) => sum + Number(order.total || 0), 0),
+    pending: filteredOrders.filter((o) => (o.status || "pending") === "pending").length,
+    paid: filteredOrders.filter((o) => (o.status || "pending") === "paid").length,
+    completed: filteredOrders.filter((o) => (o.status || "pending") === "completed").length,
+    cancelled: filteredOrders.filter((o) => (o.status || "pending") === "cancelled").length
+  };
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Түр хүлээнэ үү...</Text>
+      <View style={[screen, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 12, color: colors.textMuted }}>Admin panel ачааллаж байна...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={{ flex: 1, padding: 20, backgroundColor: "#f5f5f5" }}>
-      <Text style={{ fontSize: 26, fontWeight: "bold", marginBottom: 20 }}>
-        🛠 Admin Panel
-      </Text>
-
-      <View style={{ marginBottom: 16 }}>
-        <Button
-          title="🔄 Захиалга refresh"
-          onPress={async () => {
-            setLoading(true);
-            await loadOrders();
-            setLoading(false);
-          }}
-        />
-      </View>
-
-      <View
-        style={{
-          backgroundColor: "white",
-          padding: 16,
-          borderRadius: 12,
-          marginBottom: 20
-        }}
-      >
-        <TextInput
-          placeholder="Product name"
-          value={name}
-          onChangeText={setName}
-          style={{ borderWidth: 1, marginBottom: 10, padding: 10, borderRadius: 8 }}
-        />
-
-        <TextInput
-          placeholder="Price"
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="numeric"
-          style={{ borderWidth: 1, marginBottom: 10, padding: 10, borderRadius: 8 }}
-        />
-
-        <TextInput
-          placeholder="Image URL"
-          value={image}
-          onChangeText={setImage}
-          style={{ borderWidth: 1, marginBottom: 10, padding: 10, borderRadius: 8 }}
-        />
-
-        <Button
-          title={editingId ? "💾 Update Product" : "➕ Add Product"}
-          onPress={saveProduct}
-        />
-      </View>
-
-      <View
-        style={{
-          backgroundColor: "white",
-          borderRadius: 12,
-          padding: 16,
-          marginBottom: 20
-        }}
-      >
-        <Text style={{ fontSize: 22, fontWeight: "700", marginBottom: 12 }}>
-          📦 Хэрэглэгчдийн захиалга
-        </Text>
-
+    <ScrollView style={screen}>
+      <View style={content}>
         <View
           style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            justifyContent: "space-between",
+            backgroundColor: colors.primaryDark,
+            borderRadius: 30,
+            padding: 22,
             marginBottom: 16
           }}
         >
-          <View style={summaryCard}>
-            <Text style={summaryLabel}>Нийт order</Text>
-            <Text style={summaryValue}>{filteredOrders.length}</Text>
-          </View>
-
-          <View style={summaryCard}>
-            <Text style={summaryLabel}>Нийт дүн</Text>
-            <Text style={summaryValue}>{totalRevenue}₮</Text>
-          </View>
-
-          <View style={summaryCard}>
-            <Text style={summaryLabel}>Pending</Text>
-            <Text style={summaryValue}>{pendingCount}</Text>
-          </View>
-
-          <View style={summaryCard}>
-            <Text style={summaryLabel}>Paid</Text>
-            <Text style={summaryValue}>{paidCount}</Text>
-          </View>
-
-          <View style={summaryCard}>
-            <Text style={summaryLabel}>Completed</Text>
-            <Text style={summaryValue}>{completedCount}</Text>
-          </View>
-
-          <View style={summaryCard}>
-            <Text style={summaryLabel}>Cancelled</Text>
-            <Text style={summaryValue}>{cancelledCount}</Text>
-          </View>
-        </View>
-
-        <View
-          style={{
-            backgroundColor: "white",
-            borderRadius: 14,
-            padding: 12,
-            marginBottom: 16,
-            borderWidth: 1,
-            borderColor: "#e5e7eb"
-          }}
-        >
-          <TextInput
-            placeholder="Order ID, User ID, Username хайх..."
-            value={searchText}
-            onChangeText={setSearchText}
-            style={{ fontSize: 16 }}
-          />
-        </View>
-
-        <View
-          style={{
-            backgroundColor: "white",
-            borderRadius: 16,
-            padding: 8,
-            marginBottom: 16,
-            shadowColor: "#000",
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 3 },
-            elevation: 2
-          }}
-        >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 10
-            }}
-          >
-            <TouchableOpacity
-              onPress={() => setDateFilter("all")}
-              style={{
-                backgroundColor: dateFilter === "all" ? "#111827" : "#f3f4f6",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 999
-              }}
-            >
-              <Text
-                style={{
-                  color: dateFilter === "all" ? "#fff" : "#111827",
-                  fontWeight: "700"
-                }}
-              >
-                Бүх огноо
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setDateFilter("today")}
-              style={{
-                backgroundColor: dateFilter === "today" ? "#2563eb" : "#eff6ff",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 999
-              }}
-            >
-              <Text
-                style={{
-                  color: dateFilter === "today" ? "#fff" : "#1d4ed8",
-                  fontWeight: "700"
-                }}
-              >
-                Өнөөдөр
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setDateFilter("7days")}
-              style={{
-                backgroundColor: dateFilter === "7days" ? "#16a34a" : "#f0fdf4",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 999
-              }}
-            >
-              <Text
-                style={{
-                  color: dateFilter === "7days" ? "#fff" : "#166534",
-                  fontWeight: "700"
-                }}
-              >
-                Сүүлийн 7 хоног
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        <View
-          style={{
-            backgroundColor: "white",
-            borderRadius: 16,
-            padding: 8,
-            marginBottom: 16,
-            shadowColor: "#000",
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 3 },
-            elevation: 2
-          }}
-        >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 10
-            }}
-          >
-            <TouchableOpacity
-              onPress={() => setStatusFilter("all")}
-              style={{
-                backgroundColor: statusFilter === "all" ? "#111827" : "#f3f4f6",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 999,
-                minWidth: 90,
-                alignItems: "center"
-              }}
-            >
-              <Text
-                style={{
-                  color: statusFilter === "all" ? "#fff" : "#111827",
-                  fontWeight: "700"
-                }}
-              >
-                ⚫ Бүгд
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setStatusFilter("pending")}
-              style={{
-                backgroundColor: statusFilter === "pending" ? "#dc2626" : "#fef2f2",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 999,
-                minWidth: 100,
-                alignItems: "center"
-              }}
-            >
-              <Text
-                style={{
-                  color: statusFilter === "pending" ? "#fff" : "#b91c1c",
-                  fontWeight: "700"
-                }}
-              >
-                🔴 Pending
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setStatusFilter("paid")}
-              style={{
-                backgroundColor: statusFilter === "paid" ? "#2563eb" : "#eff6ff",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 999,
-                minWidth: 90,
-                alignItems: "center"
-              }}
-            >
-              <Text
-                style={{
-                  color: statusFilter === "paid" ? "#fff" : "#1d4ed8",
-                  fontWeight: "700"
-                }}
-              >
-                🔵 Paid
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setStatusFilter("completed")}
-              style={{
-                backgroundColor: statusFilter === "completed" ? "#16a34a" : "#f0fdf4",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 999,
-                minWidth: 120,
-                alignItems: "center"
-              }}
-            >
-              <Text
-                style={{
-                  color: statusFilter === "completed" ? "#fff" : "#166534",
-                  fontWeight: "700"
-                }}
-              >
-                🟢 Completed
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setStatusFilter("cancelled")}
-              style={{
-                backgroundColor: statusFilter === "cancelled" ? "#7f1d1d" : "#fef2f2",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 999,
-                minWidth: 110,
-                alignItems: "center"
-              }}
-            >
-              <Text
-                style={{
-                  color: statusFilter === "cancelled" ? "#fff" : "#991b1b",
-                  fontWeight: "700"
-                }}
-              >
-                ❌ Cancelled
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        <Text style={{ marginBottom: 12, color: "#6b7280" }}>
-          Нийт захиалга: {orders.length}
-        </Text>
-
-        {filteredOrders.length === 0 ? (
-          <Text style={{ color: "#6b7280" }}>
-            Тохирох захиалга олдсонгүй
+          <Text style={{ color: "#fdba74", fontSize: 14, fontWeight: "700", marginBottom: 8 }}>ADMIN PANEL</Text>
+          <Text style={{ color: "white", fontSize: 30, fontWeight: "900", marginBottom: 8 }}>
+            Захиалга ба барааны удирдлага
           </Text>
-        ) : (
-          filteredOrders.map((order) => (
-            <TouchableOpacity
-              key={order.id}
-              onPress={() =>
-                router.push({
-                  pathname: "/order-details",
-                  params: { orderId: String(order.id) }
-                })
-              }
-              style={{
-                backgroundColor: "#f9fafb",
-                borderRadius: 10,
-                padding: 12,
-                marginBottom: 12
-              }}
-            >
-              <Text style={{ fontWeight: "700", marginBottom: 6 }}>
-                Order #{order.id}
-              </Text>
+          <Text style={{ color: "#ffedd5", lineHeight: 22 }}>
+            Админ талаас бараа нэмэх, засах, устгах болон төлбөрийн төлөв шинэчлэх хэсэг.
+          </Text>
+        </View>
 
-              <Text>User ID: {order.user_id}</Text>
-              <Text>Username: {order.username}</Text>
-              <Text>Төлбөрийн төрөл: {order.payment_method || "Сонгоогүй"}</Text>
-<Text>Тайлбар: {order.payment_note || "-"}</Text>
-              <Text>Нийт дүн: {order.total}₮</Text>
-              <Text style={{ marginBottom: 8 }}>
-                Огноо: {order.created_at}
-              </Text>
-
-              <View
-                style={{
-                  alignSelf: "flex-start",
-                  backgroundColor: getStatusStyle(order.status || "pending").backgroundColor,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 999,
-                  marginBottom: 10
-                }}
-              >
-                <Text
-                  style={{
-                    color: getStatusStyle(order.status || "pending").color,
-                    fontWeight: "700"
-                  }}
-                >
-                  {getStatusStyle(order.status || "pending").label}
-                </Text>
-              </View>
-
-              <View style={{ marginBottom: 8 }}>
-                <Button
-                  title="💳 Төлбөр авсан"
-                  onPress={() => updateOrderStatus(order.id, "paid")}
-                />
-              </View>
-
-              <View style={{ marginBottom: 8 }}>
-                <Button
-                  title="📦 Дуусгах"
-                  onPress={() => updateOrderStatus(order.id, "completed")}
-                />
-              </View>
-
-              <View>
-                <Button
-                  title="❌ Цуцлах"
-                  color="#dc2626"
-                  onPress={() => updateOrderStatus(order.id, "cancelled")}
-                />
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </View>
-
-      <FlatList
-        data={products}
-        scrollEnabled={false}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View
+        <View style={[card, { marginBottom: 16 }]}>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: colors.text, marginBottom: 14 }}>
+            Бараа нэмэх эсвэл засах
+          </Text>
+          <TextInput
+            placeholder="Барааны нэр"
+            placeholderTextColor={colors.textSoft}
+            value={name}
+            onChangeText={setName}
+            style={[input, { marginBottom: 12 }]}
+          />
+          <TextInput
+            placeholder="Үнэ"
+            placeholderTextColor={colors.textSoft}
+            keyboardType="numeric"
+            value={price}
+            onChangeText={setPrice}
+            style={[input, { marginBottom: 12 }]}
+          />
+          <TextInput
+            placeholder="Зургийн URL"
+            placeholderTextColor={colors.textSoft}
+            value={image}
+            onChangeText={setImage}
+            style={[input, { marginBottom: 14 }]}
+          />
+          <TouchableOpacity
+            onPress={saveProduct}
+            activeOpacity={0.9}
             style={{
-              backgroundColor: "white",
-              borderRadius: 12,
-              marginBottom: 12,
-              overflow: "hidden"
+              backgroundColor: colors.primary,
+              borderRadius: 16,
+              paddingVertical: 14,
+              alignItems: "center"
             }}
           >
-            {item.image ? (
-              <Image
-                source={{ uri: item.image }}
-                style={{ width: "100%", height: 180 }}
-                resizeMode="cover"
-              />
-            ) : null}
+            <Text style={{ color: "white", fontWeight: "800" }}>
+              {editingId ? "Өөрчлөлт хадгалах" : "Шинэ бараа нэмэх"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-            <View style={{ padding: 16 }}>
-              <Text style={{ fontSize: 18, fontWeight: "600" }}>{item.name}</Text>
-              <Text style={{ marginTop: 6 }}>{item.price}₮</Text>
+        <View style={[card, { marginBottom: 16 }]}>
+          <Text style={{ fontSize: 22, fontWeight: "900", color: colors.text, marginBottom: 14 }}>
+            Захиалгын шүүлтүүр ба тойм
+          </Text>
 
-              <View style={{ marginTop: 12 }}>
-                <Button
-                  title="✏️ Edit"
-                  onPress={() => {
-                    setEditingId(item.id);
-                    setName(item.name);
-                    setPrice(String(item.price));
-                    setImage(item.image || "");
-                  }}
-                />
-              </View>
-
-              <View style={{ marginTop: 10 }}>
-                <Button
-                  title="❌ Delete"
-                  color="#dc2626"
-                  onPress={() => deleteProduct(item.id)}
-                />
-              </View>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginBottom: 4 }}>
+            <View style={summaryCard}>
+              <Text style={{ color: colors.textMuted, marginBottom: 6 }}>Захиалга</Text>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: colors.text }}>{summary.total}</Text>
+            </View>
+            <View style={summaryCard}>
+              <Text style={{ color: colors.textMuted, marginBottom: 6 }}>Орлого</Text>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: colors.text }}>{formatCurrency(summary.revenue)}</Text>
+            </View>
+            <View style={summaryCard}>
+              <Text style={{ color: colors.textMuted, marginBottom: 6 }}>Pending</Text>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: colors.text }}>{summary.pending}</Text>
+            </View>
+            <View style={summaryCard}>
+              <Text style={{ color: colors.textMuted, marginBottom: 6 }}>Paid</Text>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: colors.text }}>{summary.paid}</Text>
+            </View>
+            <View style={summaryCard}>
+              <Text style={{ color: colors.textMuted, marginBottom: 6 }}>Completed</Text>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: colors.text }}>{summary.completed}</Text>
+            </View>
+            <View style={summaryCard}>
+              <Text style={{ color: colors.textMuted, marginBottom: 6 }}>Cancelled</Text>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: colors.text }}>{summary.cancelled}</Text>
             </View>
           </View>
-        )}
-      />
+
+          <TextInput
+            placeholder="Order ID, User ID, Username хайх"
+            placeholderTextColor={colors.textSoft}
+            value={searchText}
+            onChangeText={setSearchText}
+            style={[input, { marginBottom: 12 }]}
+          />
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {[
+                ["all", "Бүх огноо"],
+                ["today", "Өнөөдөр"],
+                ["7days", "Сүүлийн 7 хоног"]
+              ].map(([key, label]) => (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => setDateFilter(key)}
+                  style={{
+                    backgroundColor: dateFilter === key ? colors.accent : colors.surfaceMuted,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 999
+                  }}
+                >
+                  <Text style={{ color: dateFilter === key ? "white" : colors.text, fontWeight: "800" }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {[
+                ["all", "Бүгд"],
+                ["pending", "Pending"],
+                ["paid", "Paid"],
+                ["completed", "Completed"],
+                ["cancelled", "Cancelled"]
+              ].map(([key, label]) => (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => setStatusFilter(key)}
+                  style={{
+                    backgroundColor: statusFilter === key ? colors.primary : colors.surfaceMuted,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 999
+                  }}
+                >
+                  <Text style={{ color: statusFilter === key ? "white" : colors.text, fontWeight: "800" }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+
+        <Text style={{ fontSize: 22, fontWeight: "900", color: colors.text, marginBottom: 12 }}>
+          Хэрэглэгчийн захиалгууд
+        </Text>
+        {filteredOrders.map((order) => {
+          const status = getStatusStyle(order.status || "pending");
+          return (
+            <View key={order.id} style={[card, { marginBottom: 14 }]}>
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: "/order-details",
+                    params: { orderId: String(order.id) }
+                  })
+                }
+                activeOpacity={0.9}
+              >
+                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.text, marginBottom: 8 }}>
+                  Захиалга #{order.id}
+                </Text>
+                <Text style={{ color: colors.textMuted, marginBottom: 4 }}>User ID: {order.user_id}</Text>
+                <Text style={{ color: colors.textMuted, marginBottom: 4 }}>Username: {order.username}</Text>
+                <Text style={{ color: colors.textMuted, marginBottom: 4 }}>
+                  Төлбөрийн төрөл: {order.payment_method || "Сонгоогүй"}
+                </Text>
+                <Text style={{ color: colors.textMuted, marginBottom: 4 }}>
+                  Тайлбар: {order.payment_note || "-"}
+                </Text>
+                <Text style={{ color: colors.textMuted, marginBottom: 4 }}>
+                  Нийт дүн: {formatCurrency(order.total)}
+                </Text>
+                <Text style={{ color: colors.textMuted, marginBottom: 10 }}>
+                  Огноо: {formatDate(order.created_at)}
+                </Text>
+                <View
+                  style={{
+                    alignSelf: "flex-start",
+                    backgroundColor: status.backgroundColor,
+                    borderRadius: 999,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    marginBottom: 12
+                  }}
+                >
+                  <Text style={{ color: status.color, fontWeight: "800" }}>{status.label}</Text>
+                </View>
+              </TouchableOpacity>
+
+              {[
+                ["paid", "Төлбөр батлах", "#2563eb"],
+                ["completed", "Хүргэлт дуусгах", "#16a34a"],
+                ["cancelled", "Цуцлах", "#dc2626"]
+              ].map(([key, label, bg]) => (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => updateOrderStatus(order.id, key)}
+                  style={{
+                    backgroundColor: bg,
+                    borderRadius: 14,
+                    paddingVertical: 12,
+                    alignItems: "center",
+                    marginBottom: 8
+                  }}
+                >
+                  <Text style={{ color: "white", fontWeight: "800" }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          );
+        })}
+
+        <Text style={{ fontSize: 22, fontWeight: "900", color: colors.text, marginBottom: 12, marginTop: 8 }}>
+          Барааны жагсаалт
+        </Text>
+        {products.map((item) => (
+          <View key={item.id} style={[card, { padding: 0, overflow: "hidden", marginBottom: 14 }]}>
+            {item.image ? <Image source={{ uri: item.image }} style={{ width: "100%", height: 180 }} resizeMode="cover" /> : null}
+            <View style={{ padding: 18 }}>
+              <Text style={{ fontSize: 20, fontWeight: "800", color: colors.text, marginBottom: 6 }}>{item.name}</Text>
+              <Text style={{ color: colors.primaryDark, fontWeight: "900", marginBottom: 14 }}>
+                {formatCurrency(item.price)}
+              </Text>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setEditingId(item.id);
+                  setName(item.name);
+                  setPrice(String(item.price));
+                  setImage(item.image || "");
+                }}
+                style={{
+                  backgroundColor: colors.surfaceMuted,
+                  borderRadius: 14,
+                  paddingVertical: 12,
+                  alignItems: "center",
+                  marginBottom: 8
+                }}
+              >
+                <Text style={{ color: colors.text, fontWeight: "800" }}>Засах</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => deleteProduct(item.id)}
+                style={{
+                  backgroundColor: "#fee2e2",
+                  borderRadius: 14,
+                  paddingVertical: 12,
+                  alignItems: "center"
+                }}
+              >
+                <Text style={{ color: colors.danger, fontWeight: "800" }}>Устгах</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </View>
     </ScrollView>
   );
 }
-

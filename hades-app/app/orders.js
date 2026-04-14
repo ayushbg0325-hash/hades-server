@@ -1,172 +1,145 @@
-import { useEffect, useState } from "react";
-import { View, Text, FlatList, Alert, TouchableOpacity } from "react-native";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+
 import { API_URL as SERVER_URL } from "../constants/api";
-const getStatusStyle = (status) => {
-  switch (status) {
-    case "paid":
-      return {
-        backgroundColor: "#dbeafe",
-        color: "#1d4ed8",
-        label: "Төлбөр авсан"
-      };
-    case "completed":
-      return {
-        backgroundColor: "#dcfce7",
-        color: "#166534",
-        label: "Дууссан"
-      };
-    case "cancelled":
-      return {
-        backgroundColor: "#fee2e2",
-        color: "#b91c1c",
-        label: "Цуцалсан"
-      };
-    case "pending":
-    default:
-      return {
-        backgroundColor: "#fef3c7",
-        color: "#92400e",
-        label: "Төлбөр хүлээгдэж байна"
-      };
-  }
-};
+import { getStatusStyle } from "../constants/order-status";
+import { card, colors, content, formatCurrency, formatDate, screen } from "../constants/ui";
+
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
+      setLoading(true);
       const token = await AsyncStorage.getItem("token");
 
       if (!token) {
-        Alert.alert("Алдаа", "Нэвтрээгүй байна");
+        Alert.alert("Нэвтрэлт шаардлагатай", "Эхлээд систем рүү нэвтэрнэ үү.");
         router.replace("/");
         return;
       }
 
-      // 1. profile авах
       const profileRes = await fetch(`${SERVER_URL}/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-
       const profileData = await profileRes.json();
-      console.log("PROFILE DATA:", profileData);
 
       if (!profileRes.ok || !profileData.user) {
-        Alert.alert("Алдаа", profileData.msg || "Profile уншиж чадсангүй");
+        Alert.alert("Алдаа", profileData.msg || "Профайл уншиж чадсангүй.");
         router.replace("/");
         return;
       }
 
-      const userId = profileData.user.id;
-
-      // 2. orders авах
-      const ordersRes = await fetch(`${SERVER_URL}/orders/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+      const ordersRes = await fetch(`${SERVER_URL}/orders/${profileData.user.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-
       const ordersData = await ordersRes.json();
-      console.log("ORDERS DATA:", ordersData);
-
       setOrders(Array.isArray(ordersData) ? ordersData : []);
     } catch (error) {
       console.log("ORDERS ERROR:", error);
-      Alert.alert("Алдаа", "Захиалгын түүх ачаалж чадсангүй");
+      Alert.alert("Алдаа", "Захиалгын түүх ачаалсангүй.");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadOrders();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadOrders();
+    }, [loadOrders])
+  );
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Түр хүлээнэ үү...</Text>
+      <View style={[screen, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 12, color: colors.textMuted }}>Захиалгууд ачааллаж байна...</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f3f4f6", padding: 16, paddingTop: 30 }}>
-      <Text
-        style={{
-          fontSize: 28,
-          fontWeight: "bold",
-          textAlign: "center",
-          marginBottom: 20
-        }}
-      >
-        📦 Захиалгын түүх
-      </Text>
+    <ScrollView style={screen}>
+      <View style={content}>
+        <View
+          style={{
+            backgroundColor: "#1f2937",
+            borderRadius: 30,
+            padding: 22,
+            marginBottom: 16
+          }}
+        >
+          <Text style={{ color: "#cbd5e1", fontSize: 14, fontWeight: "700", marginBottom: 8 }}>
+            ORDER HISTORY
+          </Text>
+          <Text style={{ color: "white", fontSize: 30, fontWeight: "900", marginBottom: 8 }}>
+            Миний захиалгууд
+          </Text>
+          <Text style={{ color: "#e5e7eb", lineHeight: 22 }}>
+            Захиалга бүрийн төлөв, дүн, дэлгэрэнгүй мэдээллийг эндээс харна.
+          </Text>
+        </View>
 
-      <FlatList
-        data={orders}
-        keyExtractor={(item) => item.id.toString()}
-        ListEmptyComponent={
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 14,
-              padding: 20
-            }}
-          >
-            <Text style={{ textAlign: "center", color: "#6b7280" }}>
-              Захиалга алга байна
+        {orders.length === 0 ? (
+          <View style={card}>
+            <Text style={{ fontSize: 20, fontWeight: "800", color: colors.text, marginBottom: 8 }}>
+              Захиалга алга
             </Text>
+            <Text style={{ color: colors.textMuted }}>Шинэ бараа сонгоод анхны захиалгаа үүсгээрэй.</Text>
           </View>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() =>
-  router.push({
-    pathname: "/order-details",
-    params: { orderId: String(item.id) }
-  })
-}
-            style={{
-              backgroundColor: "white",
-              borderRadius: 14,
-              padding: 16,
-              marginBottom: 12
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 6 }}>
-              Order #{item.id}
-            </Text>
-
-            <Text style={{ marginBottom: 4 }}>Нийт дүн: {item.total}₮</Text>
-            <View
-  style={{
-    alignSelf: "flex-start",
-    backgroundColor: getStatusStyle(item.status || "pending").backgroundColor,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 8
-  }}
->
-  <Text
-    style={{
-      color: getStatusStyle(item.status || "pending").color,
-      fontWeight: "700"
-    }}
-  >
-    {getStatusStyle(item.status || "pending").label}
-  </Text>
-</View>
-            <Text>Огноо: {item.created_at}</Text>
-          </TouchableOpacity>
+        ) : (
+          orders.map((item) => {
+            const status = getStatusStyle(item.status || "pending");
+            return (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() =>
+                  router.push({
+                    pathname: "/order-details",
+                    params: { orderId: String(item.id) }
+                  })
+                }
+                activeOpacity={0.9}
+                style={[card, { marginBottom: 14 }]}
+              >
+                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.text, marginBottom: 8 }}>
+                  Захиалга #{item.id}
+                </Text>
+                <View
+                  style={{
+                    alignSelf: "flex-start",
+                    backgroundColor: status.backgroundColor,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 999,
+                    marginBottom: 10
+                  }}
+                >
+                  <Text style={{ color: status.color, fontWeight: "800" }}>{status.label}</Text>
+                </View>
+                <Text style={{ color: colors.textMuted, marginBottom: 4 }}>
+                  Нийт дүн: {formatCurrency(item.total)}
+                </Text>
+                <Text style={{ color: colors.textMuted, marginBottom: 10 }}>
+                  Огноо: {formatDate(item.created_at)}
+                </Text>
+                <Text style={{ color: colors.primaryDark, fontWeight: "800" }}>Дэлгэрэнгүй харах</Text>
+              </TouchableOpacity>
+            );
+          })
         )}
-      />
-    </View>
+      </View>
+    </ScrollView>
   );
 }

@@ -1,50 +1,70 @@
-# Welcome to your Expo app 👋
+# Hades Mobile App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Энэ бол `hades-server` backend-тэй холбогддог Expo mobile app.
 
-## Get started
+## QR-аар утсан дээр нээх
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+1. Backend асаана
 
 ```bash
-npm run reset-project
+cd ..
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Expo app асаана
 
-## Learn more
+```bash
+npm.cmd run start:lan
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Хэрвээ LAN ажиллахгүй бол:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm.cmd run start:tunnel
+```
 
-## Join the community
+3. Утсандаа `Expo Go` суулгана
 
-Join our community of developers creating universal apps.
+- Android: Expo Go from Play Store
+- iPhone: Expo Go from App Store
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+4. Terminal дээр гарсан QR кодыг Expo Go-оор уншуулна
+
+## Root folder-оос шууд ажиллуулах
+
+Backend:
+
+```bash
+npm start
+```
+
+Expo QR:
+
+```bash
+npm run mobile
+```
+
+Expo QR tunnel:
+
+```bash
+npm run mobile:tunnel
+```
+
+## API холболт
+
+App нь default байдлаар Expo development host-ийн IP-г ашиглаад backend рүү `http://<your-lan-ip>:3000` гэж холбогдоно.
+
+Хэрвээ гараар заах хэрэгтэй бол `hades-app` дотор `.env` файл үүсгээд:
+
+```bash
+EXPO_PUBLIC_API_URL=http://172.36.1.112:3000
+```
+
+гэж өгч болно.
+
+## Чухал анхаарах зүйлс
+
+- Утас болон компьютер нэг сүлжээнд байвал `start:lan` хамгийн хурдан.
+- Windows firewall `Node.js`-ийг private network дээр зөвшөөрсөн байх хэрэгтэй.
+- Backend асаахад console дээр `LAN URL` гарч ирнэ. Тэр IP-г browser-оор утаснаас нээж шалгаж болно.
+- `start:tunnel` нь QR нээхэд тусалдаг ч API тань локал backend байгаа бол ихэнхдээ LAN тохиргоо илүү зөв ажиллана.

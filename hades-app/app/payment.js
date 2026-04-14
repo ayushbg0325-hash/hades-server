@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
+  ActivityIndicator,
   Alert,
   ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator
+  View
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, router } from "expo-router";
 
 import { API_URL as SERVER_URL } from "../constants/api";
+import { card, colors, content, formatCurrency, screen } from "../constants/ui";
 
 export default function PaymentScreen() {
   const { orderId, totalPrice } = useLocalSearchParams();
@@ -23,7 +24,7 @@ export default function PaymentScreen() {
 
   useEffect(() => {
     if (!orderId) {
-      Alert.alert("Error", "Order ID not found");
+      Alert.alert("Алдаа", "Захиалгын дугаар олдсонгүй.");
       router.back();
     }
   }, [orderId]);
@@ -36,16 +37,15 @@ export default function PaymentScreen() {
 
   const savePaymentMethod = async () => {
     if (!selectedMethod) {
-      Alert.alert("Warning", "Choose a payment method first");
+      Alert.alert("Анхаар", "Төлбөрийн хэлбэрээ сонгоно уу.");
       return;
     }
 
     try {
       setSaving(true);
-
       const token = await AsyncStorage.getItem("token");
       if (!token) {
-        Alert.alert("Error", "You are not logged in");
+        Alert.alert("Нэвтрэлт шаардлагатай", "Эхлээд систем рүү нэвтэрнэ үү.");
         return;
       }
 
@@ -60,250 +60,151 @@ export default function PaymentScreen() {
           payment_note: note
         })
       });
-
       const data = await response.json();
-      if (data.message) {
-        Alert.alert("Success", "Payment information saved");
+
+      if (response.ok && data.message) {
         router.replace("/orders");
         return;
       }
 
-      Alert.alert("Error", data.msg || "Could not save payment details");
+      Alert.alert("Алдаа", data.msg || "Төлбөрийн мэдээлэл хадгалсангүй.");
     } catch (error) {
       console.log("SAVE PAYMENT METHOD ERROR:", error);
-      Alert.alert("Error", "Could not connect to the server");
+      Alert.alert("Алдаа", "Сервертэй холбогдсонгүй.");
     } finally {
       setSaving(false);
     }
   };
 
-  const MethodCard = ({ icon, title, subtitle, isActive, onPress }) => (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.9}
-      style={{
-        backgroundColor: isActive ? "#111827" : "white",
-        borderRadius: 18,
-        padding: 18,
-        marginBottom: 14,
-        borderWidth: 1.5,
-        borderColor: isActive ? "#111827" : "#e5e7eb",
-        shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 2
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center"
-        }}
+  const renderMethodCard = (key, title, subtitle, palette) => {
+    const active = selectedMethod === key;
+    return (
+      <TouchableOpacity
+        key={key}
+        onPress={() => setSelectedMethod(key)}
+        activeOpacity={0.9}
+        style={[
+          card,
+          {
+            marginBottom: 14,
+            backgroundColor: active ? palette.activeBg : colors.surfaceStrong,
+            borderColor: active ? palette.activeBorder : colors.border
+          }
+        ]}
       >
-        <View style={{ flex: 1, paddingRight: 12 }}>
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: "700",
-              color: isActive ? "white" : "#111827",
-              marginBottom: 6
-            }}
-          >
-            {icon} {title}
-          </Text>
-
-          <Text
-            style={{
-              color: isActive ? "#d1d5db" : "#6b7280",
-              lineHeight: 20
-            }}
-          >
-            {subtitle}
-          </Text>
-        </View>
-
-        <View
+        <Text
           style={{
-            width: 24,
-            height: 24,
-            borderRadius: 999,
-            borderWidth: 2,
-            borderColor: isActive ? "white" : "#9ca3af",
-            justifyContent: "center",
-            alignItems: "center"
+            fontSize: 20,
+            fontWeight: "800",
+            color: active ? palette.activeText : colors.text,
+            marginBottom: 6
           }}
         >
-          {isActive ? (
-            <View
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: 999,
-                backgroundColor: "white"
-              }}
-            />
-          ) : null}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+          {title}
+        </Text>
+        <Text style={{ color: active ? palette.activeSubtle : colors.textMuted, lineHeight: 21 }}>{subtitle}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   if (!orderId) {
     return null;
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#f3f4f6" }}>
-      <View style={{ padding: 16, paddingTop: 28 }}>
-        <Text
+    <ScrollView style={screen}>
+      <View style={content}>
+        <View
           style={{
-            fontSize: 28,
-            fontWeight: "800",
-            color: "#111827",
+            backgroundColor: colors.accent,
+            borderRadius: 30,
+            padding: 22,
             marginBottom: 16
           }}
         >
-          Payment Method
-        </Text>
-
-        <View
-          style={{
-            backgroundColor: "white",
-            borderRadius: 18,
-            padding: 18,
-            marginBottom: 16,
-            shadowColor: "#000",
-            shadowOpacity: 0.06,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 2
-          }}
-        >
-          <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 10 }}>
-            Order Summary
+          <Text style={{ color: "#a5f3fc", fontSize: 14, fontWeight: "700", marginBottom: 8 }}>PAYMENT</Text>
+          <Text style={{ color: "white", fontSize: 30, fontWeight: "900", marginBottom: 8 }}>
+            Төлбөрийн мэдээлэл
           </Text>
-          <Text style={{ color: "#374151", marginBottom: 6 }}>Order ID: {orderId}</Text>
-          <Text style={{ color: "#374151", marginBottom: 6 }}>
-            Total: {totalPrice ? `${totalPrice}₮` : "Check the order list for the total"}
+          <Text style={{ color: "#cffafe", lineHeight: 22 }}>
+            Захиалга баталгаажуулахын тулд төлбөрийн хэлбэрээ сонгоод хадгална уу.
           </Text>
-          <View
-            style={{
-              alignSelf: "flex-start",
-              marginTop: 6,
-              backgroundColor: "#fef3c7",
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 999
-            }}
-          >
-            <Text style={{ color: "#92400e", fontWeight: "700" }}>Awaiting payment review</Text>
-          </View>
         </View>
 
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: "700",
-            color: "#111827",
-            marginBottom: 12
-          }}
-        >
-          Select payment method
+        <View style={[card, { marginBottom: 16 }]}>
+          <Text style={{ fontSize: 20, fontWeight: "800", color: colors.text, marginBottom: 10 }}>
+            Захиалгын хураангуй
+          </Text>
+          <Text style={{ color: colors.textMuted, marginBottom: 6 }}>Захиалга: #{orderId}</Text>
+          <Text style={{ color: colors.primaryDark, fontWeight: "900", fontSize: 22 }}>
+            Нийт дүн: {formatCurrency(totalPrice)}
+          </Text>
+        </View>
+
+        <Text style={{ fontSize: 22, fontWeight: "900", color: colors.text, marginBottom: 12 }}>
+          Төлбөрийн хэлбэр сонгох
         </Text>
 
-        <MethodCard
-          icon="💵"
-          title="Cash"
-          subtitle="Pay in cash when the order is handed over."
-          isActive={selectedMethod === "cash"}
-          onPress={() => setSelectedMethod("cash")}
-        />
+        {renderMethodCard("cash", "Бэлэн мөнгө", "Хүлээлгэн өгөх үед бэлнээр төлнө.", {
+          activeBg: "#172033",
+          activeBorder: "#172033",
+          activeText: "#ffffff",
+          activeSubtle: "#cbd5e1"
+        })}
 
-        <MethodCard
-          icon="🏦"
-          title="Bank transfer"
-          subtitle="Transfer to the account below and keep the transfer reference."
-          isActive={selectedMethod === "bank_transfer"}
-          onPress={() => setSelectedMethod("bank_transfer")}
-        />
+        {renderMethodCard("bank_transfer", "Дансаар шилжүүлэх", "Доорх данс руу шилжүүлээд гүйлгээний утгаа хадгална.", {
+          activeBg: "#9a3412",
+          activeBorder: "#9a3412",
+          activeText: "#ffffff",
+          activeSubtle: "#fed7aa"
+        })}
 
-        {selectedMethod === "cash" && (
-          <View
-            style={{
-              backgroundColor: "#ecfeff",
-              borderRadius: 18,
-              padding: 18,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: "#bae6fd"
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 10 }}>Cash payment</Text>
-            <Text style={{ color: "#0f172a", lineHeight: 22 }}>
-              Your order will remain in pending status until an admin confirms payment was received.
+        {selectedMethod === "cash" ? (
+          <View style={[card, { marginBottom: 16, backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }]}>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: "#1d4ed8", marginBottom: 8 }}>
+              Бэлэн төлбөрийн тайлбар
+            </Text>
+            <Text style={{ color: "#1e3a8a", lineHeight: 22 }}>
+              Админ төлбөрийг баталгаажуулах хүртэл захиалга хүлээгдэж буй төлөвт байна.
             </Text>
           </View>
-        )}
+        ) : null}
 
-        {selectedMethod === "bank_transfer" && (
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 18,
-              padding: 18,
-              marginBottom: 16,
-              shadowColor: "#000",
-              shadowOpacity: 0.06,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 4 },
-              elevation: 2
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 12 }}>
-              Bank details
+        {selectedMethod === "bank_transfer" ? (
+          <View style={[card, { marginBottom: 16 }]}>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: colors.text, marginBottom: 10 }}>
+              Шилжүүлгийн мэдээлэл
             </Text>
-            <Text style={{ marginBottom: 8, color: "#374151" }}>Bank: Khan Bank</Text>
-            <Text style={{ marginBottom: 8, color: "#374151" }}>Account: 1234567890</Text>
-            <Text style={{ marginBottom: 8, color: "#374151" }}>Name: Hades Store</Text>
-            <Text style={{ marginBottom: 14, color: "#374151", fontWeight: "700" }}>
-              Reference: {paymentRef}
+            <Text style={{ color: colors.textMuted, marginBottom: 6 }}>Банк: Khan Bank</Text>
+            <Text style={{ color: colors.textMuted, marginBottom: 6 }}>Данс: 1234567890</Text>
+            <Text style={{ color: colors.textMuted, marginBottom: 12 }}>Хүлээн авагч: Hades Store</Text>
+            <Text style={{ color: colors.primaryDark, fontWeight: "900", marginBottom: 12 }}>
+              Гүйлгээний утга: {paymentRef}
             </Text>
-
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: "700",
-                marginBottom: 8,
-                color: "#111827"
-              }}
-            >
-              Transfer note
-            </Text>
-
             <TextInput
-              placeholder="Example: ORDER-39 / your name"
+              placeholder="Жишээ: ORDER-39 / таны нэр"
+              placeholderTextColor={colors.textSoft}
               value={note}
               onChangeText={setNote}
               style={{
                 borderWidth: 1,
-                borderColor: "#d1d5db",
-                borderRadius: 12,
-                padding: 12,
-                backgroundColor: "#f9fafb"
+                borderColor: colors.border,
+                borderRadius: 16,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                backgroundColor: "#fffdf9"
               }}
             />
           </View>
-        )}
+        ) : null}
 
         <TouchableOpacity
           onPress={savePaymentMethod}
-          activeOpacity={0.9}
           disabled={saving}
+          activeOpacity={0.9}
           style={{
-            backgroundColor: saving ? "#9ca3af" : "#2563eb",
-            borderRadius: 16,
+            backgroundColor: saving ? colors.textSoft : colors.primary,
+            borderRadius: 18,
             paddingVertical: 15,
             alignItems: "center",
             marginBottom: 16
@@ -312,39 +213,16 @@ export default function PaymentScreen() {
           {saving ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text
-              style={{
-                color: "white",
-                fontSize: 16,
-                fontWeight: "800"
-              }}
-            >
-              Save selection
-            </Text>
+            <Text style={{ color: "white", fontSize: 16, fontWeight: "800" }}>Төлбөрийн мэдээлэл хадгалах</Text>
           )}
         </TouchableOpacity>
 
-        <View
-          style={{
-            backgroundColor: "#fff7ed",
-            borderRadius: 18,
-            padding: 18,
-            borderWidth: 1,
-            borderColor: "#fed7aa"
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 16,
-              fontWeight: "800",
-              color: "#7c2d12",
-              marginBottom: 10
-            }}
-          >
-            Important
+        <View style={[card, { backgroundColor: "#fff7ed", borderColor: "#fed7aa" }]}>
+          <Text style={{ fontSize: 16, fontWeight: "800", color: colors.warning, marginBottom: 8 }}>
+            Санамж
           </Text>
-          <Text style={{ color: "#7c2d12", lineHeight: 22 }}>
-            After you choose a payment method, the order stays pending until an admin verifies it.
+          <Text style={{ color: colors.warning, lineHeight: 22 }}>
+            Сонголтоо хадгалсны дараа админ баталгаажуулж байж захиалга дараагийн төлөв рүү шилжинэ.
           </Text>
         </View>
       </View>
