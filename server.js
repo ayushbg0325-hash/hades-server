@@ -765,7 +765,7 @@ app.get("/admin/stats", verifyToken, verifyAdmin, (req, res) => {
     `
     SELECT
       (SELECT COUNT(*) FROM orders) AS totalOrders,
-      (SELECT COALESCE(SUM(total), 0) FROM orders WHERE status = 'paid') AS totalRevenue,
+      (SELECT COALESCE(SUM(total), 0) FROM orders WHERE status IN ('paid', 'completed')) AS totalRevenue,
       (SELECT COUNT(*) FROM orders WHERE status = 'pending') AS pendingOrders,
       (SELECT COUNT(*) FROM orders WHERE status = 'paid') AS paidOrders
     `,
@@ -785,7 +785,7 @@ app.get("/admin/revenue-chart", verifyToken, verifyAdmin, (req, res) => {
     `
     SELECT DATE(created_at) AS day, SUM(total) AS revenue
     FROM orders
-    WHERE status = 'paid'
+    WHERE status IN ('paid', 'completed')
     GROUP BY DATE(created_at)
     ORDER BY day ASC
     `,
