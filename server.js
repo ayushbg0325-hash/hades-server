@@ -6,6 +6,7 @@ const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
 const mysql = require("mysql2");
+const os = require("os");
 const app = express();
 console.log("HOST:", process.env.MYSQLHOST);
 app.use(express.json());
@@ -28,25 +29,48 @@ app.get("/", (req, res) => {
 //const db = mysql.createConnection(process.env.MYSQL_PUBLIC_URL);
 //
 let db;
+let dbReady = false;
 
 try {
-  db = mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "",
-    database: "hades"
+  const dbConfig = {
+    host: process.env.MYSQLHOST || "localhost",
+    port: Number(process.env.MYSQLPORT || 3306),
+    user: process.env.MYSQLUSER || "root",
+    password: process.env.MYSQLPASSWORD || "",
+    database: process.env.MYSQLDATABASE || "hades"
+  };
+
+  if (dbConfig.host !== "localhost" && dbConfig.host !== "127.0.0.1") {
+    dbConfig.ssl = {
+      rejectUnauthorized: false
+    };
+  }
+
+  db = mysql.createPool({
+    ...dbConfig,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0
   });
 
-  db.connect(err => {
+  db.getConnection((err, connection) => {
     if (err) {
-      console.log("DB холболт алдаа:", err.message);
-    } else {
-      console.log("DB амжилттай холбогдлоо");
+      dbReady = false;
+      db = null;
+      console.log("DB connection error:", err.message);
+      return;
     }
-  });
 
+    dbReady = true;
+    console.log("DB connected successfully");
+    connection.release();
+  });
 } catch (e) {
-  console.log("DB skip хийлээ");
+  db = null;
+  dbReady = false;
+  console.log("DB setup skipped");
 }
 app.use((req, res, next) => {
   if (req.path === "/") {
@@ -54,7 +78,7 @@ app.use((req, res, next) => {
     return;
   }
 
-  if (!db) {
+  if (!db || !dbReady) {
     res.status(500).json({ msg: "Database connection is not available" });
     return;
   }
@@ -155,7 +179,13 @@ app.post("/login", (req, res) => {
         console.log("LOGIN USER:", user);
 
         try {
-          const isMatch = await bcrypt.compare(password, user.password);
+          const isBcryptHash =
+            typeof user.password === "string" &&
+            /^\$2[aby]\$\d{2}\$/.test(user.password);
+
+          const isMatch = isBcryptHash
+            ? await bcrypt.compare(password, user.password)
+            : password === user.password;
 
           if (!isMatch) {
             return res.status(401).json({ msg: "Нууц үг буруу" });
@@ -772,10 +802,30 @@ app.get("/admin/revenue-chart", verifyToken, verifyAdmin, (req, res) => {
 
 // ------------------- START SERVER -------------------
 const DEFAULT_PORT = Number(process.env.PORT) || 3000;
+const DEFAULT_HOST = process.env.HOST || "0.0.0.0";
+
+const getLanIp = () => {
+  const interfaces = os.networkInterfaces();
+
+  for (const network of Object.values(interfaces)) {
+    for (const address of network || []) {
+      if (address.family === "IPv4" && !address.internal) {
+        return address.address;
+      }
+    }
+  }
+
+  return null;
+};
 
 const startServer = (port, allowFallback = true) => {
-  const server = app.listen(port, () => {
+  const server = app.listen(port, DEFAULT_HOST, () => {
+    const lanIp = getLanIp();
     console.log("Server " + port + " port deer ajillaj baina");
+    console.log("Local URL: http://localhost:" + port);
+    if (lanIp) {
+      console.log("LAN URL: http://" + lanIp + ":" + port);
+    }
   });
 
   server.on("error", (error) => {
